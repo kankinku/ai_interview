@@ -57,7 +57,7 @@ const Navbar = () => {
 
             {user ? (
               <div className="flex items-center space-x-2">
-                <span className="text-sm text-slate-600">안녕하세요, {user.email}</span>
+                <span className="text-sm text-slate-600">안녕하세요, {user.name}      </span>
                 <Button size="sm" variant="outline" onClick={handleLogout}>
                   <LogOut className="h-4 w-4 mr-1" />
                   로그아웃
@@ -103,7 +103,7 @@ const Navbar = () => {
 
               {user ? (
                 <div className="px-3 py-2 space-y-2">
-                  <p className="text-sm text-slate-600">안녕하세요, {user.email}</p>
+                  <p className="text-sm text-slate-600">안녕하세요, {user.name}      </p>
                   <Button size="sm" variant="outline" onClick={handleLogout} className="w-full">
                     <LogOut className="h-4 w-4 mr-1" />
                     로그아웃
