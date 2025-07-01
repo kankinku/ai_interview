@@ -25,21 +25,21 @@ CREATE TABLE login_info (
     FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE CASCADE
 );
 
--- 4. interview_session
+
 CREATE TABLE interview_session (
     interview_id INT PRIMARY KEY AUTO_INCREMENT,
     user_id INT NOT NULL,
-    field VARCHAR(100) NOT NULL,              -- 면접 진행 분야
-    language VARCHAR(50) NOT NULL,            -- 면접 진행 언어
-    status ENUM('in_progress', 'completed') DEFAULT 'in_progress',
+    learning_field VARCHAR(100) NOT NULL,         -- 면접 진행 분야
+    preferred_language VARCHAR(50) NOT NULL,      -- 면접 진행 언어
     start_time DATETIME DEFAULT CURRENT_TIMESTAMP,   -- 면접 시작 시각
     end_time DATETIME,                                 -- 면접 종료 시각
-    duration_minutes INT GENERATED ALWAYS AS (        -- 자동 계산된 소요 시간 (분)
+    duration_minutes INT GENERATED ALWAYS AS (
         TIMESTAMPDIFF(MINUTE, start_time, end_time)
     ) STORED,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE CASCADE
 );
+
 
 -- 5. question
 CREATE TABLE question (
