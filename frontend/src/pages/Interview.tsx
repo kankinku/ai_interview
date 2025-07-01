@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -6,16 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { 
-  Mic, 
-  MicOff, 
-  Video, 
-  VideoOff, 
-  Play, 
-  Pause, 
-  SkipForward,
-  Settings,
-  HelpCircle,
-  Clock
+  Mic, MicOff, Video, VideoOff, Play, Pause, 
+  SkipForward, Settings, HelpCircle, Clock 
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -23,14 +14,18 @@ const Interview = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
-  
+
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
-  const [timeRemaining, setTimeRemaining] = useState(180); // 3 minutes per question
+  const [timeRemaining, setTimeRemaining] = useState(180);
   const [transcription, setTranscription] = useState("");
   const [isInterviewStarted, setIsInterviewStarted] = useState(false);
+
+  const wsRef = useRef<WebSocket | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
 
   const questions = [
     "자기소개를 해주세요. 본인의 강점과 경험을 중심으로 설명해주시면 됩니다.",
@@ -40,7 +35,6 @@ const Interview = () => {
     "5년 후 본인의 모습과 커리어 목표에 대해 이야기해주세요."
   ];
 
-  // Timer effect
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isRecording && timeRemaining > 0) {
@@ -53,17 +47,11 @@ const Interview = () => {
     return () => clearInterval(interval);
   }, [isRecording, timeRemaining]);
 
-  // Camera setup
   useEffect(() => {
     const setupCamera = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: true, 
-          audio: true 
-        });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        if (videoRef.current) videoRef.current.srcObject = stream;
       } catch (error) {
         console.error("Camera setup failed:", error);
         toast({
@@ -73,15 +61,64 @@ const Interview = () => {
         });
       }
     };
-
-    if (isVideoOn) {
-      setupCamera();
-    }
+    if (isVideoOn) setupCamera();
   }, [isVideoOn, toast]);
+
+  const startSpeechRecognition = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      const audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(stream);
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      processorRef.current = processor;
+
+      const ws = new WebSocket("ws://localhost:8765");
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        processor.onaudioprocess = (e) => {
+          const inputData = e.inputBuffer.getChannelData(0);
+          const float32Data = new Float32Array(inputData);
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(float32Data.buffer);
+          }
+        };
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+      };
+
+      ws.onmessage = (event) => {
+        const text = event.data;
+        if (text) setTranscription((prev) => prev + " " + text);
+      };
+
+      ws.onerror = (err) => console.error("STT WebSocket 에러:", err);
+      ws.onclose = () => console.log("🔌 STT 서버 연결 종료");
+    } catch (err) {
+      console.error("🎤 음성 인식 시작 실패:", err);
+      toast({
+        title: "음성 인식 실패",
+        description: "마이크 권한을 허용했는지 확인해주세요.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const stopSpeechRecognition = () => {
+    processorRef.current?.disconnect();
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    wsRef.current?.close();
+    processorRef.current = null;
+    mediaStreamRef.current = null;
+    wsRef.current = null;
+  };
 
   const startInterview = () => {
     setIsInterviewStarted(true);
     setIsRecording(true);
+    setTranscription("");
+    startSpeechRecognition();
     toast({
       title: "면접이 시작되었습니다",
       description: "편안하게 답변해주세요. 언제든 일시정지할 수 있습니다."
@@ -89,14 +126,35 @@ const Interview = () => {
   };
 
   const toggleRecording = () => {
-    setIsRecording(!isRecording);
+    const nextState = !isRecording;
+    setIsRecording(nextState);
+    nextState ? startSpeechRecognition() : stopSpeechRecognition();
     toast({
-      title: isRecording ? "면접 일시정지" : "면접 재시작",
-      description: isRecording ? "면접이 일시정지되었습니다." : "면접이 재시작되었습니다."
+      title: nextState ? "면접 재시작" : "면접 일시정지",
+      description: nextState ? "면접이 재시작되었습니다." : "면접이 일시정지되었습니다."
     });
   };
 
-  const handleNextQuestion = () => {
+  const handleNextQuestion = async () => {
+    try {
+      await fetch("http://localhost:3000/api/interview/response", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionIndex: currentQuestion,
+          text: transcription.trim()
+        })
+      });
+      console.log(`✅ 질문 ${currentQuestion + 1} 응답 전송됨`);
+    } catch (err) {
+      console.error("❌ 응답 전송 실패:", err);
+      toast({
+        title: "전송 실패",
+        description: "응답 데이터를 서버로 전송하지 못했습니다.",
+        variant: "destructive"
+      });
+    }
+
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
       setTimeRemaining(180);
@@ -106,30 +164,18 @@ const Interview = () => {
         description: `질문 ${currentQuestion + 2}번으로 이동합니다.`
       });
     } else {
-      // Interview completed
       toast({
         title: "면접 완료!",
         description: "수고하셨습니다. 결과를 분석 중입니다..."
       });
-      setTimeout(() => {
-        navigate("/results/1");
-      }, 2000);
+      stopSpeechRecognition();
+      setTimeout(() => navigate("/results/1"), 2000);
     }
   };
 
-  const toggleVideo = () => {
-    setIsVideoOn(!isVideoOn);
-  };
-
-  const toggleMic = () => {
-    setIsMicOn(!isMicOn);
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+  const toggleVideo = () => setIsVideoOn(!isVideoOn);
+  const toggleMic = () => setIsMicOn(!isMicOn);
+  const formatTime = (seconds: number) => `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`;
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -152,14 +198,10 @@ const Interview = () => {
             )}
           </div>
         </div>
-        
-        <Progress 
-          value={((currentQuestion + 1) / questions.length) * 100} 
-          className="mt-4 h-2"
-        />
+        <Progress value={((currentQuestion + 1) / questions.length) * 100} className="mt-4 h-2" />
       </div>
 
-      {/* Current Question - Prominent Display */}
+      {/* Current Question */}
       <div className="mb-8">
         <Card className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
           <CardHeader className="pb-4">
@@ -173,7 +215,6 @@ const Interview = () => {
               <p className="text-2xl md:text-3xl lg:text-4xl font-semibold leading-relaxed text-slate-800 mb-6">
                 {questions[currentQuestion]}
               </p>
-              
               <div className="p-4 bg-blue-100 rounded-lg border border-blue-200">
                 <p className="text-base text-blue-800">
                   💡 <strong>답변 팁:</strong> 구체적인 경험과 결과를 포함하여 답변하면 더 좋은 평가를 받을 수 있습니다.
@@ -192,20 +233,10 @@ const Interview = () => {
               <CardTitle className="flex items-center justify-between">
                 <span>면접 화면</span>
                 <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={toggleVideo}
-                    className={isVideoOn ? "" : "bg-red-50 border-red-200"}
-                  >
+                  <Button variant="outline" size="sm" onClick={toggleVideo} className={isVideoOn ? "" : "bg-red-50 border-red-200"}>
                     {isVideoOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={toggleMic}
-                    className={isMicOn ? "" : "bg-red-50 border-red-200"}
-                  >
+                  <Button variant="outline" size="sm" onClick={toggleMic} className={isMicOn ? "" : "bg-red-50 border-red-200"}>
                     {isMicOn ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
                   </Button>
                   <Button variant="outline" size="sm">
@@ -216,13 +247,7 @@ const Interview = () => {
             </CardHeader>
             <CardContent>
               <div className="relative bg-slate-900 rounded-lg overflow-hidden">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  muted
-                  className="w-full h-64 md:h-80 object-cover"
-                  style={{ display: isVideoOn ? 'block' : 'none' }}
-                />
+                <video ref={videoRef} autoPlay muted className="w-full h-64 md:h-80 object-cover" style={{ display: isVideoOn ? 'block' : 'none' }} />
                 {!isVideoOn && (
                   <div className="w-full h-64 md:h-80 flex items-center justify-center text-white">
                     <div className="text-center">
@@ -231,58 +256,29 @@ const Interview = () => {
                     </div>
                   </div>
                 )}
-                
-                {/* Recording indicator */}
                 {isRecording && (
                   <div className="absolute top-4 left-4 flex items-center gap-2 bg-red-600 text-white px-3 py-1 rounded-full text-sm">
                     <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
                     녹화 중
                   </div>
                 )}
-
-                {/* AI Status */}
                 <div className="absolute top-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
                   AI 분석 중...
                 </div>
               </div>
 
-              {/* Control Buttons */}
               <div className="flex justify-center gap-4 mt-6">
                 {!isInterviewStarted ? (
-                  <Button 
-                    onClick={startInterview}
-                    size="lg"
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
+                  <Button onClick={startInterview} size="lg" className="bg-blue-600 hover:bg-blue-700">
                     <Play className="mr-2 h-5 w-5" />
                     면접 시작
                   </Button>
                 ) : (
                   <>
-                    <Button
-                      onClick={toggleRecording}
-                      variant={isRecording ? "destructive" : "default"}
-                      size="lg"
-                    >
-                      {isRecording ? (
-                        <>
-                          <Pause className="mr-2 h-5 w-5" />
-                          일시정지
-                        </>
-                      ) : (
-                        <>
-                          <Play className="mr-2 h-5 w-5" />
-                          재시작
-                        </>
-                      )}
+                    <Button onClick={toggleRecording} variant={isRecording ? "destructive" : "default"} size="lg">
+                      {isRecording ? (<><Pause className="mr-2 h-5 w-5" />일시정지</>) : (<><Play className="mr-2 h-5 w-5" />재시작</>)}
                     </Button>
-                    
-                    <Button
-                      onClick={handleNextQuestion}
-                      variant="outline"
-                      size="lg"
-                      disabled={currentQuestion >= questions.length - 1}
-                    >
+                    <Button onClick={handleNextQuestion} variant="outline" size="lg" disabled={currentQuestion >= questions.length - 1}>
                       <SkipForward className="mr-2 h-5 w-5" />
                       다음 질문
                     </Button>
@@ -309,8 +305,6 @@ const Interview = () => {
                   </p>
                 )}
               </div>
-              
-              {/* Live feedback indicators */}
               <div className="grid grid-cols-2 gap-4 mt-4">
                 <div className="text-center p-2 bg-green-50 rounded-lg">
                   <div className="text-sm text-green-600">말하기 속도</div>

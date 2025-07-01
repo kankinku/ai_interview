@@ -6,3 +6,6 @@ node_modules/
 
 # 로그 파일
 *.log
+
+modules/model-ko/
+modules/model-ko/**
