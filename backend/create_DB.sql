@@ -69,10 +69,6 @@ CREATE TABLE content_evaluation (
     interview_id INT NOT NULL,
     question_text TEXT NOT NULL,
     response_text TEXT NOT NULL,
-    content_score FLOAT,
-    content_feedback TEXT,
-    feedback_category ENUM('logic', 'clarity', 'depth', 'language') DEFAULT 'logic',
-    feedback_score INT CHECK (feedback_score BETWEEN 1 AND 5),
     is_archived BOOLEAN DEFAULT FALSE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (interview_id) REFERENCES interview_session(interview_id) ON DELETE CASCADE

@@ -136,16 +136,19 @@ const Interview = () => {
   };
 
   const handleNextQuestion = async () => {
+    const questionText = questions[currentQuestion];
+    const answerText = transcription.trim();
+
     try {
-      await fetch("http://localhost:3000/api/interview/response", {
+      await fetch("http://192.168.0.44:3000/api/interview/response", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          questionIndex: currentQuestion,
-          text: transcription.trim()
+          question: questionText,
+          answer: answerText
         })
       });
-      console.log(`✅ 질문 ${currentQuestion + 1} 응답 전송됨`);
+      console.log(`✅ 질문 전송 완료: ${questionText}`);
     } catch (err) {
       console.error("❌ 응답 전송 실패:", err);
       toast({
@@ -172,6 +175,7 @@ const Interview = () => {
       setTimeout(() => navigate("/results/1"), 2000);
     }
   };
+
 
   const toggleVideo = () => setIsVideoOn(!isVideoOn);
   const toggleMic = () => setIsMicOn(!isMicOn);
