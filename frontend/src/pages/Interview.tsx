@@ -10,6 +10,9 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+
+const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 const Interview = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -66,44 +69,55 @@ const Interview = () => {
 
   const startSpeechRecognition = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaStreamRef.current = stream;
-      const audioContext = new AudioContext();
-      const source = audioContext.createMediaStreamSource(stream);
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-      processorRef.current = processor;
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaStreamRef.current = stream;
 
-      const ws = new WebSocket("ws://localhost:8765");
-      wsRef.current = ws;
+        const audioContext = new AudioContext();
+        await audioContext.audioWorklet.addModule("/audio-processor.js");
 
-      ws.onopen = () => {
-        processor.onaudioprocess = (e) => {
-          const inputData = e.inputBuffer.getChannelData(0);
-          const float32Data = new Float32Array(inputData);
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(float32Data.buffer);
-          }
+        const source = audioContext.createMediaStreamSource(stream);
+        const workletNode = new AudioWorkletNode(audioContext, "audio-processor");
+
+        wsRef.current = new WebSocket("ws://localhost:8765");
+
+        wsRef.current.onopen = () => {
+            console.log("🎙️ STT WebSocket 연결됨");
+
+            workletNode.port.onmessage = (event) => {
+                const float32Data = new Float32Array(event.data);
+                if (wsRef.current?.readyState === WebSocket.OPEN) {
+                    wsRef.current.send(float32Data.buffer);
+                }
+            };
+
+            source.connect(workletNode).connect(audioContext.destination);
         };
-        source.connect(processor);
-        processor.connect(audioContext.destination);
-      };
 
-      ws.onmessage = (event) => {
-        const text = event.data;
-        if (text) setTranscription((prev) => prev + " " + text);
-      };
+        wsRef.current.onmessage = (event) => {
+            const text = event.data;
+            if (text) {
+                setTranscription((prev) => prev + " " + text);
+            }
+        };
 
-      ws.onerror = (err) => console.error("STT WebSocket 에러:", err);
-      ws.onclose = () => console.log("🔌 STT 서버 연결 종료");
+        wsRef.current.onerror = (err) => {
+            console.error("STT WebSocket 에러:", err);
+        };
+
+        wsRef.current.onclose = () => {
+            console.log("🔌 STT 연결 종료");
+        };
+
     } catch (err) {
-      console.error("🎤 음성 인식 시작 실패:", err);
-      toast({
-        title: "음성 인식 실패",
-        description: "마이크 권한을 허용했는지 확인해주세요.",
-        variant: "destructive"
-      });
+        console.error("🎤 음성 인식 실패:", err);
+        toast({
+            title: "음성 인식 실패",
+            description: "마이크 권한을 허용했는지 확인해주세요.",
+            variant: "destructive"
+        });
     }
-  };
+};
+
 
   const stopSpeechRecognition = () => {
     processorRef.current?.disconnect();
@@ -114,16 +128,37 @@ const Interview = () => {
     wsRef.current = null;
   };
 
-  const startInterview = () => {
+  const startInterview = async () => {
     setIsInterviewStarted(true);
     setIsRecording(true);
     setTranscription("");
     startSpeechRecognition();
+
+    // 면접 시작 알림 전송
+    try {
+      await fetch(`${BASE_URL}/api/interview/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          timestamp: new Date().toISOString()
+        })
+      });
+      console.log("✅ 면접 시작 요청 전송 완료");
+    } catch (err) {
+      console.error("❌ 면접 시작 요청 실패:", err);
+      toast({
+        title: "면접 시작 실패",
+        description: "서버에 면접 시작 요청을 전송하지 못했습니다.",
+        variant: "destructive"
+      });
+    }
+
     toast({
       title: "면접이 시작되었습니다",
       description: "편안하게 답변해주세요. 언제든 일시정지할 수 있습니다."
     });
   };
+
 
   const toggleRecording = () => {
     const nextState = !isRecording;
@@ -140,7 +175,7 @@ const Interview = () => {
     const answerText = transcription.trim();
 
     try {
-      await fetch("http://192.168.0.44:3000/api/interview/response", {
+      await fetch(`${BASE_URL}/api/interview/response`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -328,3 +363,5 @@ const Interview = () => {
 };
 
 export default Interview;
+
+
