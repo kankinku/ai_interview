@@ -4,12 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Mic, MicOff, Video, VideoOff, Play, Pause, 
-  SkipForward, Settings, HelpCircle, Clock 
+import {
+  Mic, MicOff, Video, VideoOff, Play, Pause,
+  SkipForward, Settings, HelpCircle, Clock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
+import { useAuth } from "@/contexts/AuthContext"; // ✅ 유저 정보 가져오기
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -17,6 +17,7 @@ const Interview = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const { user } = useAuth(); // ✅ 로그인된 유저 정보
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
@@ -69,55 +70,54 @@ const Interview = () => {
 
   const startSpeechRecognition = async () => {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaStreamRef.current = stream;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
 
-        const audioContext = new AudioContext();
-        await audioContext.audioWorklet.addModule("/audio-processor.js");
+      const audioContext = new AudioContext();
+      await audioContext.audioWorklet.addModule("/audio-processor.js");
 
-        const source = audioContext.createMediaStreamSource(stream);
-        const workletNode = new AudioWorkletNode(audioContext, "audio-processor");
+      const source = audioContext.createMediaStreamSource(stream);
+      const workletNode = new AudioWorkletNode(audioContext, "audio-processor");
 
-        wsRef.current = new WebSocket("ws://localhost:8765");
+      wsRef.current = new WebSocket("ws://localhost:8765");
 
-        wsRef.current.onopen = () => {
-            console.log("🎙️ STT WebSocket 연결됨");
+      wsRef.current.onopen = () => {
+        console.log("🎙️ STT WebSocket 연결됨");
 
-            workletNode.port.onmessage = (event) => {
-                const float32Data = new Float32Array(event.data);
-                if (wsRef.current?.readyState === WebSocket.OPEN) {
-                    wsRef.current.send(float32Data.buffer);
-                }
-            };
-
-            source.connect(workletNode).connect(audioContext.destination);
+        workletNode.port.onmessage = (event) => {
+          const float32Data = new Float32Array(event.data);
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(float32Data.buffer);
+          }
         };
 
-        wsRef.current.onmessage = (event) => {
-            const text = event.data;
-            if (text) {
-                setTranscription((prev) => prev + " " + text);
-            }
-        };
+        source.connect(workletNode).connect(audioContext.destination);
+      };
 
-        wsRef.current.onerror = (err) => {
-            console.error("STT WebSocket 에러:", err);
-        };
+      wsRef.current.onmessage = (event) => {
+        const text = event.data;
+        if (text) {
+          setTranscription((prev) => prev + " " + text);
+        }
+      };
 
-        wsRef.current.onclose = () => {
-            console.log("🔌 STT 연결 종료");
-        };
+      wsRef.current.onerror = (err) => {
+        console.error("STT WebSocket 에러:", err);
+      };
+
+      wsRef.current.onclose = () => {
+        console.log("🔌 STT 연결 종료");
+      };
 
     } catch (err) {
-        console.error("🎤 음성 인식 실패:", err);
-        toast({
-            title: "음성 인식 실패",
-            description: "마이크 권한을 허용했는지 확인해주세요.",
-            variant: "destructive"
-        });
+      console.error("🎤 음성 인식 실패:", err);
+      toast({
+        title: "음성 인식 실패",
+        description: "마이크 권한을 허용했는지 확인해주세요.",
+        variant: "destructive"
+      });
     }
-};
-
+  };
 
   const stopSpeechRecognition = () => {
     processorRef.current?.disconnect();
@@ -129,21 +129,24 @@ const Interview = () => {
   };
 
   const startInterview = async () => {
+    if (!user) return;
+
     setIsInterviewStarted(true);
     setIsRecording(true);
     setTranscription("");
     startSpeechRecognition();
 
-    // 면접 시작 알림 전송
     try {
-      await fetch(`${BASE_URL}/api/interview/start`, {
+      const response = await fetch(`${BASE_URL}/api/interview/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          timestamp: new Date().toISOString()
-        })
+        body: JSON.stringify({ user_id: user.id }) // ✅ 수정됨
       });
       console.log("✅ 면접 시작 요청 전송 완료");
+      if (!response.ok) {
+        const data = await response.json();
+        console.error("❌ 응답 오류:", data);
+      }
     } catch (err) {
       console.error("❌ 면접 시작 요청 실패:", err);
       toast({
@@ -159,7 +162,6 @@ const Interview = () => {
     });
   };
 
-
   const toggleRecording = () => {
     const nextState = !isRecording;
     setIsRecording(nextState);
@@ -171,16 +173,24 @@ const Interview = () => {
   };
 
   const handleNextQuestion = async () => {
+    if (!user) return;
+
     const questionText = questions[currentQuestion];
     const answerText = transcription.trim();
 
     try {
+      console.log("🟡 전송할 데이터:", {
+        question: questionText,
+        answer: answerText,
+        user_id: user.id // ✅ 수정됨
+      });
       await fetch(`${BASE_URL}/api/interview/response`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question: questionText,
-          answer: answerText
+          answer: answerText,
+          user_id: user.id // ✅ 수정됨
         })
       });
       console.log(`✅ 질문 전송 완료: ${questionText}`);
@@ -193,6 +203,7 @@ const Interview = () => {
       });
     }
 
+    
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
       setTimeRemaining(180);
@@ -208,6 +219,33 @@ const Interview = () => {
       });
       stopSpeechRecognition();
       setTimeout(() => navigate("/results/1"), 2000);
+    }
+  };
+
+  const handleInterviewFinish = async () => {
+    if (!user) return;
+
+    try {
+      await fetch(`${BASE_URL}/api/interview/finish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: user.id })
+      });
+
+      toast({
+        title: "면접 종료",
+        description: "결과 페이지로 이동합니다..."
+      });
+
+      stopSpeechRecognition();
+      setTimeout(() => navigate("/results/1"), 2000);
+    } catch (err) {
+      console.error("❌ 인터뷰 종료 요청 실패:", err);
+      toast({
+        title: "종료 실패",
+        description: "서버에 종료 요청을 전송하지 못했습니다.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -317,10 +355,18 @@ const Interview = () => {
                     <Button onClick={toggleRecording} variant={isRecording ? "destructive" : "default"} size="lg">
                       {isRecording ? (<><Pause className="mr-2 h-5 w-5" />일시정지</>) : (<><Play className="mr-2 h-5 w-5" />재시작</>)}
                     </Button>
-                    <Button onClick={handleNextQuestion} variant="outline" size="lg" disabled={currentQuestion >= questions.length - 1}>
-                      <SkipForward className="mr-2 h-5 w-5" />
-                      다음 질문
-                    </Button>
+
+                    {currentQuestion < questions.length - 1 ? (
+                      <Button onClick={handleNextQuestion} variant="outline" size="lg">
+                        <SkipForward className="mr-2 h-5 w-5" />
+                        다음 질문
+                      </Button>
+                    ) : (
+                      <Button onClick={handleInterviewFinish} variant="outline" size="lg">
+                        <SkipForward className="mr-2 h-5 w-5" />
+                        인터뷰 종료
+                      </Button>
+                    )}
                   </>
                 )}
               </div>
