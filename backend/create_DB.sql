@@ -11,6 +11,8 @@ CREATE TABLE user_info (
     phone VARCHAR(20),
     learning_field VARCHAR(100) NOT NULL,
     preferred_language VARCHAR(50) NOT NULL,
+    career_years INT DEFAULT 0,                     -- 경력 (년 단위)
+    desired_salary INT DEFAULT NULL,                -- 희망 연봉 (단위: 만원 등)
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -38,8 +40,6 @@ CREATE TABLE interview_session (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE CASCADE
 );
-
-
 
 -- 5. question
 CREATE TABLE question (
