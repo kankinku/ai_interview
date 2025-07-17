@@ -4,11 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "vite",        // Vite 개발 서버 실행
+    "build": "vite build", // 빌드 명령
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",  // 미리보기 서버 실행
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
