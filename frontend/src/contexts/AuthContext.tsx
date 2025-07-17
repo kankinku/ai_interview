@@ -28,7 +28,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     // 백엔드 주소: localhost 대신 현재 서버의 실제 IP 사용
-    const BASE_URL = "http://192.168.0.44:3000";
+    // const BASE_URL = "http://192.168.0.44:3000";
+    const BASE_URL = "http://localhost:3000";
 
     const signUp = async (email: string, password: string, name: string) => {
         const res = await fetch(`${BASE_URL}/api/signup`, {

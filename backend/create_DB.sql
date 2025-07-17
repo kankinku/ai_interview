@@ -16,7 +16,15 @@ CREATE TABLE user_info (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. login_info
+-- 3. company
+CREATE TABLE company (
+    company_id INT PRIMARY KEY AUTO_INCREMENT,
+    company_name VARCHAR(100) NOT NULL UNIQUE,
+    talent_url VARCHAR(255),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4. login_info
 CREATE TABLE login_info (
     login_id INT PRIMARY KEY AUTO_INCREMENT,
     user_id INT NOT NULL,
