@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext"; // ✅ 유저 정보 가져오기
+import axios from "axios";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -26,18 +27,47 @@ const Interview = () => {
   const [timeRemaining, setTimeRemaining] = useState(180);
   const [transcription, setTranscription] = useState("");
   const [isInterviewStarted, setIsInterviewStarted] = useState(false);
+  const [questions, setQuestions] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
 
-  const questions = [
-    "자기소개를 해주세요. 본인의 강점과 경험을 중심으로 설명해주시면 됩니다.",
-    "지원하신 직무에 대한 이해도와 관련 경험에 대해 말씀해주세요.",
-    "가장 도전적이었던 프로젝트 경험과 그때 어떻게 문제를 해결했는지 설명해주세요.",
-    "팀워크가 중요한 상황에서의 경험과 본인의 역할에 대해 말씀해주세요.",
-    "5년 후 본인의 모습과 커리어 목표에 대해 이야기해주세요."
-  ];
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      if (!user) {
+        setIsLoading(false);
+        setQuestions(["로그인이 필요합니다. 로그인 후 다시 시도해주세요."]);
+        return;
+      }
+      try {
+        const response = await axios.get(`/api/interview/questions/${user.id}`);
+        if (response.data.questions && response.data.questions.length > 0) {
+          setQuestions(response.data.questions);
+        } else {
+          setQuestions([]); // 질문이 없으면 빈 배열로 설정
+          toast({
+            title: "생성된 질문이 없습니다",
+            description: "설정 페이지에서 먼저 원하는 기업의 질문을 생성해주세요.",
+            duration: 5000,
+          });
+        }
+      } catch (error) {
+        console.error("질문 로딩 실패:", error);
+        setQuestions(["질문을 불러오는 데 실패했습니다. 페이지를 새로고침 해주세요."]);
+        toast({
+          title: "질문 로딩 실패",
+          description: "서버에서 질문을 가져오는 데 문제가 발생했습니다.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchQuestions();
+  }, [user, toast]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -67,6 +97,15 @@ const Interview = () => {
     };
     if (isVideoOn) setupCamera();
   }, [isVideoOn, toast]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-slate-900"></div>
+        <p className="ml-4 text-lg">질문을 불러오는 중입니다...</p>
+      </div>
+    );
+  }
 
   const startSpeechRecognition = async () => {
     try {
@@ -264,9 +303,11 @@ const Interview = () => {
             <p className="text-slate-600">실제 면접처럼 진행됩니다. 침착하게 답변해주세요.</p>
           </div>
           <div className="flex items-center gap-4">
-            <Badge variant="outline" className="text-sm">
-              질문 {currentQuestion + 1} / {questions.length}
-            </Badge>
+            {isInterviewStarted && (
+              <Badge variant="outline" className="text-sm">
+                질문 {currentQuestion + 1} / {questions.length}
+              </Badge>
+            )}
             {isInterviewStarted && (
               <div className="flex items-center gap-2 text-lg font-mono">
                 <Clock className="h-5 w-5" />
@@ -284,13 +325,17 @@ const Interview = () => {
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center text-blue-700">
               <HelpCircle className="mr-3 h-6 w-6" />
-              질문 {currentQuestion + 1}
+              {isInterviewStarted ? `질문 ${currentQuestion + 1}` : "면접 준비"}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-center">
-              <p className="text-2xl md:text-3xl lg:text-4xl font-semibold leading-relaxed text-slate-800 mb-6">
-                {questions[currentQuestion]}
+              <p className="text-xl md:text-2xl font-semibold leading-relaxed text-slate-800 mb-6">
+                {isInterviewStarted
+                  ? questions.length > 0
+                    ? questions[currentQuestion]
+                    : "면접 질문이 없습니다. 설정 페이지에서 질문을 생성해주세요."
+                  : "면접 시작 버튼을 누르면 이곳에서 질문이 나옵니다."}
               </p>
               <div className="p-4 bg-blue-100 rounded-lg border border-blue-200">
                 <p className="text-base text-blue-800">

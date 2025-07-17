@@ -1,4 +1,95 @@
 const db = require("../db");
+const multer = require("multer");
+const path = require("path");
+const {
+    extractTextFromPdf,
+    extractKeywordsFromUrl,
+    generateInterviewQuestions,
+} = require("../modules/interview-helper");
+
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, path.join(__dirname, "..", "uploads"));
+    },
+    filename: function (req, file, cb) {
+        cb(null, Date.now() + path.extname(file.originalname)); // Appending extension
+    },
+});
+
+const upload = multer({ storage: storage });
+
+exports.upload = upload;
+
+exports.generateQuestions = async (req, res) => {
+    const connection = await db.getConnection();
+    try {
+        const { url, user_id, company_name } = req.body;
+        const resume = req.file;
+
+        if (!url || !resume || !user_id || !company_name) {
+            return res.status(400).json({ error: "URL, 이력서 파일, 사용자 ID, 회사 이름이 모두 필요합니다." });
+        }
+        
+        await connection.beginTransaction();
+        
+        // 회사 정보 저장 또는 업데이트
+        await connection.query(
+            `INSERT INTO company (company_name, talent_url) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE talent_url = VALUES(talent_url)`,
+            [company_name, url]
+        );
+
+        const keywords = await extractKeywordsFromUrl(url);
+        const resumeText = await extractTextFromPdf(resume.path);
+        const questions = await generateInterviewQuestions(resumeText, keywords);
+
+        const insertPromises = questions.map((question) => {
+            return connection.query(
+                "INSERT INTO user_question (user_id, question_text, is_custom) VALUES (?, ?, ?)",
+                [user_id, question, true]
+            );
+        });
+
+        await Promise.all(insertPromises);
+        
+        await connection.commit();
+
+        res.status(200).json({ questions });
+    } catch (error) {
+        await connection.rollback();
+        console.error("❌ 질문 생성 및 저장 실패:", error);
+        res.status(500).json({ error: "서버 오류" });
+    } finally {
+        connection.release();
+    }
+};
+
+exports.getQuestions = async (req, res) => {
+    const { user_id } = req.params;
+
+    if (!user_id) {
+        return res.status(400).json({ error: "user_id가 필요합니다." });
+    }
+
+    try {
+        const [rows] = await db.query(
+            "SELECT question_text FROM user_question WHERE user_id = ? ORDER BY RAND() LIMIT 10",
+            [user_id]
+        );
+
+        if (rows.length === 0) {
+            // 질문이 없는 경우, 빈 배열과 함께 성공 응답을 보내 프론트에서 처리하도록 합니다.
+            return res.status(200).json({ questions: [] });
+        }
+        
+        const questions = rows.map(row => row.question_text);
+        res.status(200).json({ questions });
+
+    } catch (err) {
+        console.error("❌ 질문 조회 실패:", err);
+        res.status(500).json({ error: "서버 오류" });
+    }
+};
 
 // 인터뷰 시작
 exports.receiveInterviewStart = async (req, res) => {
@@ -71,7 +162,7 @@ exports.receiveInterviewFinish = async (req, res) => {
         const [rows] = await db.query(
             `SELECT interview_id FROM interview_session 
              WHERE user_id = ? 
-             ORDER BY created_at DESC 
+             ORDER BY start_time DESC 
              LIMIT 1`,
             [user_id]
         );
@@ -83,9 +174,10 @@ exports.receiveInterviewFinish = async (req, res) => {
         const interview_id = rows[0].interview_id;
         const endTime = new Date(); // 현재 시간
 
+        // status 제거하고 end_time만 갱신
         await db.query(
             `UPDATE interview_session 
-             SET status = 'completed', end_time = ?
+             SET end_time = ?
              WHERE interview_id = ?`,
             [endTime, interview_id]
         );

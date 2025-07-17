@@ -3,10 +3,31 @@
     "axios": "^1.10.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
-    "dotenv": "^17.0.0",
+    "dotenv": "^17.2.0",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.1",
     "mysql2": "^3.14.1",
+    "openai": "^5.9.2",
+    "pdf-parse": "^1.1.1",
     "ws": "^8.18.3"
-  }
+  },
+  "name": "ai_interview",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kankinku/ai_interview.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kankinku/ai_interview/issues"
+  },
+  "homepage": "https://github.com/kankinku/ai_interview#readme",
+  "description": ""
 }
