@@ -8,9 +8,9 @@ exports.login = async (req, res) => {
     try {
         const [rows] = await db.execute(
             `SELECT li.user_id, li.password_hash, u.user_name
-             FROM login_info li
-             JOIN user_info u ON li.user_id = u.user_id
-             WHERE li.user_identifier = ?`,
+            FROM login_info li
+            JOIN user_info u ON li.user_id = u.user_id
+            WHERE li.user_identifier = ?`,
             [email]
         );
 
@@ -40,6 +40,8 @@ exports.login = async (req, res) => {
 };
 
 exports.signup = async (req, res) => {
+    console.log("회원가입 요청 수신됨:", req.body); // ← 이 줄 추가
+
     const { name, email, password, learning_field, preferred_language } = req.body;
 
     if (!name || !email || !password)
@@ -55,21 +57,22 @@ exports.signup = async (req, res) => {
 
         const [userResult] = await db.execute(
             `INSERT INTO user_info (user_name, email, learning_field, preferred_language)
-             VALUES (?, ?, ?, ?)`,
+            VALUES (?, ?, ?, ?)`,
             [name, email, learning_field ?? null, preferred_language ?? null]
         );
-        const userId = userResult.insertId;
 
+        const userId = userResult.insertId;
         const hashedPassword = await bcrypt.hash(password, 10);
+
         await db.execute(
             `INSERT INTO login_info (user_id, user_identifier, password_hash)
-             VALUES (?, ?, ?)`,
+            VALUES (?, ?, ?)`,
             [userId, email, hashedPassword]
         );
 
         res.status(201).json({ message: "회원가입 성공", user_id: userId });
     } catch (err) {
-        console.error("회원가입 오류:", err);
+        console.error("회원가입 오류 발생 🔥:", err);  // ← 이 줄 중요!
         res.status(500).json({ error: "서버 오류" });
     }
 };

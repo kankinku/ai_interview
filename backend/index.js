@@ -3,9 +3,10 @@ const cors = require("cors");
 const app = express();
 const PORT = 3000;
 
+const evaluationRoutes = require("./routes/evaluation");
 const { connectToSTTServer } = require("./utils/sttSocketManager");
 
-// CORS 설정
+// CORS 설정 (한 번만)
 app.use(cors({
     origin: [
         "http://localhost:8080",
@@ -20,8 +21,9 @@ app.use(express.json());
 // 라우트 연결
 app.use("/api", require("./routes/auth"));
 app.use("/api/stt", require("./routes/sttRoutes"));
-app.use("/api/interview", require("./routes/interview")); // ✅ 인터뷰 응답 수신 라우트 추가
-app.use("/api", require("./routes/company")); // 추가
+app.use("/api/interview", require("./routes/interview"));
+app.use("/api", require("./routes/company"));
+app.use("/api/evaluation", evaluationRoutes); // ✅ 수정: /api 아래에 evaluation 라우트
 app.use("/", require("./routes/health"));
 
 // WebSocket STT 서버 연결
