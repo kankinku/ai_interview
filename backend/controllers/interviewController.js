@@ -6,6 +6,7 @@ const {
     extractKeywordsFromUrl,
     generateInterviewQuestions,
 } = require("../modules/interview-helper");
+const { evaluateInterview } = require("../modules/interviewEvaluation");
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -35,7 +36,7 @@ exports.generateQuestions = async (req, res) => {
         // 회사 정보 저장 또는 업데이트
         await connection.query(
             `INSERT INTO company (company_name, talent_url) VALUES (?, ?)
-             ON DUPLICATE KEY UPDATE talent_url = VALUES(talent_url)`,
+            ON DUPLICATE KEY UPDATE talent_url = VALUES(talent_url)`,
             [company_name, url]
         );
 
@@ -115,7 +116,7 @@ exports.receiveInterviewStart = async (req, res) => {
 
         await db.query(
             `INSERT INTO interview_session (user_id, learning_field, preferred_language, start_time)
-             VALUES (?, ?, ?, ?)`,
+            VALUES (?, ?, ?, ?)`,
             [user_id, learning_field, preferred_language, now]
         );
 
@@ -136,20 +137,41 @@ exports.receiveInterviewResponse = async (req, res) => {
     }
 
     try {
+        // 1. GPT 평가 수행
+        const evaluationResult = await evaluateInterview([
+            { question, answer }
+        ]);
+
+        // 2. 평가 결과 DB 저장
         await db.query(
-            `INSERT INTO content_evaluation (user_id, question, answer)
-             VALUES (?, ?, ?)`,
-            [user_id, question, answer]
+            `INSERT INTO content_evaluation (
+                user_id,
+                question,
+                answer,
+                gpt_score,
+                gpt_feedback
+            ) VALUES (?, ?, ?, ?, ?)`,
+            [
+                user_id,
+                question,
+                answer,
+                evaluationResult.totalScore,
+                evaluationResult.finalFeedback
+            ]
         );
 
-        console.log("✅ 면접 응답 DB 저장 완료");
-        res.status(200).json({ message: "응답 저장 완료" });
+        console.log("✅ GPT 분석 및 DB 저장 완료");
+
+        res.status(200).json({
+            message: "응답 및 GPT 평가 저장 완료",
+            evaluation: evaluationResult
+        });
+
     } catch (err) {
-        console.error("❌ DB 저장 실패:", err);
+        console.error("❌ GPT 평가 또는 DB 저장 실패:", err);
         res.status(500).json({ error: "서버 오류" });
     }
 };
-
 // 인터뷰 종료
 exports.receiveInterviewFinish = async (req, res) => {
     const { user_id } = req.body;
@@ -161,9 +183,9 @@ exports.receiveInterviewFinish = async (req, res) => {
     try {
         const [rows] = await db.query(
             `SELECT interview_id FROM interview_session 
-             WHERE user_id = ? 
-             ORDER BY start_time DESC 
-             LIMIT 1`,
+            WHERE user_id = ? 
+            ORDER BY start_time DESC 
+            LIMIT 1`,
             [user_id]
         );
 
@@ -177,8 +199,8 @@ exports.receiveInterviewFinish = async (req, res) => {
         // status 제거하고 end_time만 갱신
         await db.query(
             `UPDATE interview_session 
-             SET end_time = ?
-             WHERE interview_id = ?`,
+            SET end_time = ?
+            WHERE interview_id = ?`,
             [endTime, interview_id]
         );
 
