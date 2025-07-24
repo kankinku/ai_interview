@@ -10,6 +10,8 @@
     "mysql2": "^3.14.1",
     "openai": "^5.10.1",
     "pdf-parse": "^1.1.1",
+    "socket.io": "^4.8.1",
+
     "ws": "^8.18.3"
   },
   "name": "ai_interview",

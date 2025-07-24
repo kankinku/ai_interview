@@ -1,1 +1,8 @@
+
+node_modules
 node_modules"frontend/.env" 
+# .gitignore 파일에 다음 줄이 반드시 포함되어야 함
+backend/modules/model-ko/
+backend/modules/model-ko.zip
+backend/modules/model-ko.zip
+backend/modules/model-ko/

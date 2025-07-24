@@ -80,10 +80,10 @@ async def handle_connection(websocket):
     except websockets.exceptions.ConnectionClosed:
         print("❌ 클라이언트 연결 종료")
 
-async def main():
+async def start_stt_server():
     async with websockets.serve(handle_connection, "0.0.0.0", 8765):
         print("🟢 Python STT WebSocket 서버 실행 중 (port 8765)")
         await asyncio.Future()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(start_stt_server())

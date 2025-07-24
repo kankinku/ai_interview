@@ -1,12 +1,27 @@
 const db = require("../db");
 const multer = require("multer");
 const path = require("path");
+
+const axios = require("axios");
+
+const emotionScores = {
+    'happy': 5,
+    'surprise': 2,
+    'neutral': 1,
+    'sad': -3,
+    'angry': -5,
+    'disgust': -5,
+    'fear': -6
+};
+
 const {
     extractTextFromPdf,
     extractKeywordsFromUrl,
     generateInterviewQuestions,
 } = require("../modules/interview-helper");
+
 const { evaluateInterview } = require("../modules/interviewEvaluation");
+
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -92,6 +107,105 @@ exports.getQuestions = async (req, res) => {
     }
 };
 
+exports.analyzeFrame = async (req, res) => {
+    const { image, interviewId, questionNumber, userId } = req.body;
+
+    if (!image || !interviewId || questionNumber === undefined || !userId) {
+        return res.status(400).json({ error: "image, interviewId, questionNumber, userId가 모두 필요합니다." });
+    }
+
+    try {
+        const analysisResponse = await axios.post('http://localhost:5001/analyze', { image });
+        const { score_delta, contributors } = analysisResponse.data;
+
+        if (score_delta === 0) {
+            return res.status(200).json({ message: "No significant change." });
+        }
+
+        const [sessionRows] = await db.query(
+            'SELECT sentiment_score FROM interview_session WHERE interview_id = ?',
+            [interviewId]
+        );
+
+        if (sessionRows.length === 0) {
+            return res.status(404).json({ error: 'Interview session not found.' });
+        }
+
+        let currentScore = parseFloat(sessionRows[0].sentiment_score);
+        let newScore = Math.max(0, Math.min(100, currentScore + score_delta));
+        
+        const reasonParts = [];
+        for (const [emotion, percent] of Object.entries(contributors)) {
+            const score = emotionScores[emotion] || 0;
+            reasonParts.push(`${emotion}(${percent.toFixed(1)}%): (${score > 0 ? '+' : ''}${score})`);
+        }
+        const score_reason = reasonParts.join(', ');
+
+        const connection = await db.getConnection();
+        try {
+            await connection.beginTransaction();
+            
+            await connection.query(
+                'UPDATE interview_session SET sentiment_score = ? WHERE interview_id = ?',
+                [newScore, interviewId]
+            );
+            
+            await connection.query(
+                `INSERT INTO emotion_score (interview_id, question_number, score_reason, total_score)
+                 VALUES (?, ?, ?, ?)`,
+                [interviewId, questionNumber, score_reason, newScore]
+            );
+
+            await connection.commit();
+        } catch (dbError) {
+            await connection.rollback();
+            throw dbError; // re-throw to be caught by outer catch block
+        } finally {
+            connection.release();
+        }
+
+        const io = req.app.get('io');
+        const userSocketId = req.app.get('userSockets')[userId];
+        if (io && userSocketId) {
+            io.to(userSocketId).emit('sentiment-update', { newScore: newScore.toFixed(2) });
+        }
+
+        res.status(200).json({ success: true, newScore });
+
+    } catch (error) {
+        console.error("❌ 감정 분석 프레임 처리 실패:", error.response ? error.response.data : error.message);
+        res.status(500).json({ error: "감정 분석 중 서버 오류가 발생했습니다." });
+    }
+};
+
+exports.resetSentimentScore = async (req, res) => {
+    const { interviewId } = req.body;
+
+    if (!interviewId) {
+        return res.status(400).json({ error: "interviewId가 필요합니다." });
+    }
+
+    try {
+        await db.query(
+            'UPDATE interview_session SET sentiment_score = 100.00 WHERE interview_id = ?',
+            [interviewId]
+        );
+
+        const io = req.app.get('io');
+        const userSocketId = Object.keys(req.app.get('userSockets')).find(key => req.app.get('userSockets')[key] === req.body.socketId);
+
+        if (io && userSocketId) {
+            io.to(userSocketId).emit('sentiment-update', { newScore: '100.00' });
+        }
+        
+        res.status(200).json({ success: true, message: "Score has been reset." });
+
+    } catch (error) {
+        console.error("❌ 감정 점수 초기화 실패:", error);
+        res.status(500).json({ error: "점수 초기화 중 서버 오류가 발생했습니다." });
+    }
+};
+
 // 인터뷰 시작
 exports.receiveInterviewStart = async (req, res) => {
     const { user_id } = req.body;
@@ -112,16 +226,18 @@ exports.receiveInterviewStart = async (req, res) => {
 
         const { learning_field, preferred_language } = userRows[0];
 
-        const now = new Date(); // 현재 시간
+        const now = new Date();
 
-        await db.query(
-            `INSERT INTO interview_session (user_id, learning_field, preferred_language, start_time)
-            VALUES (?, ?, ?, ?)`,
+        const [result] = await db.query(
+            `INSERT INTO interview_session (user_id, learning_field, preferred_language, start_time, sentiment_score)
+             VALUES (?, ?, ?, ?, 100.00)`,
             [user_id, learning_field, preferred_language, now]
         );
 
-        console.log("📍 면접 시작 정보 DB 저장 완료");
-        res.status(200).json({ message: "면접 시작 저장 완료" });
+        const interviewId = result.insertId;
+        console.log("📍 면접 시작 정보 DB 저장 완료, interview_id:", interviewId);
+        res.status(200).json({ message: "면접 시작 저장 완료", interview_id: interviewId });
+
     } catch (err) {
         console.error("❌ 면접 시작 저장 실패:", err);
         res.status(500).json({ error: "서버 오류" });
@@ -130,48 +246,55 @@ exports.receiveInterviewStart = async (req, res) => {
 
 // 인터뷰 응답
 exports.receiveInterviewResponse = async (req, res) => {
-    const { question, answer, user_id } = req.body;
+const { interviewId, questionNumber, questionText, answerText, user_id } = req.body;
 
-    if (!question || !answer || !user_id) {
-        return res.status(400).json({ error: "필수 데이터 누락" });
-    }
+if (!interviewId || !questionNumber || !questionText || answerText === undefined || !user_id) {
+    return res.status(400).json({ error: "필수 데이터(interviewId, questionNumber, questionText, answerText, user_id) 누락" });
+}
 
-    try {
-        // 1. GPT 평가 수행
-        const evaluationResult = await evaluateInterview([
-            { question, answer }
-        ]);
+try {
+    // 1. 면접 응답 저장
+    await db.query(
+        `INSERT INTO answer_score (interview_id, question_number, question_text, answer_text)
+         VALUES (?, ?, ?, ?)`,
+        [interviewId, questionNumber, questionText, answerText]
+    );
+    console.log("✅ 면접 응답 DB 저장 완료");
 
-        // 2. 평가 결과 DB 저장
-        await db.query(
-            `INSERT INTO content_evaluation (
-                user_id,
-                question,
-                answer,
-                gpt_score,
-                gpt_feedback
-            ) VALUES (?, ?, ?, ?, ?)`,
-            [
-                user_id,
-                question,
-                answer,
-                evaluationResult.totalScore,
-                evaluationResult.finalFeedback
-            ]
-        );
+    // 2. GPT 평가 수행
+    const evaluationResult = await evaluateInterview([
+        { question: questionText, answer: answerText }
+    ]);
 
-        console.log("✅ GPT 분석 및 DB 저장 완료");
+    // 3. 평가 결과 저장
+    await db.query(
+        `INSERT INTO content_evaluation (
+            user_id,
+            question,
+            answer,
+            gpt_score,
+            gpt_feedback
+        ) VALUES (?, ?, ?, ?, ?)`,
+        [
+            user_id,
+            questionText,
+            answerText,
+            evaluationResult.totalScore,
+            evaluationResult.finalFeedback
+        ]
+    );
+    console.log("✅ GPT 분석 및 평가 결과 저장 완료");
 
-        res.status(200).json({
-            message: "응답 및 GPT 평가 저장 완료",
-            evaluation: evaluationResult
-        });
+    res.status(200).json({
+        message: "면접 응답 및 GPT 평가 저장 완료",
+        evaluation: evaluationResult
+    });
 
-    } catch (err) {
-        console.error("❌ GPT 평가 또는 DB 저장 실패:", err);
-        res.status(500).json({ error: "서버 오류" });
-    }
-};
+} catch (err) {
+    console.error("❌ DB 저장 또는 GPT 평가 실패:", err);
+    res.status(500).json({ error: "서버 오류" });
+}
+
 // 인터뷰 종료
 exports.receiveInterviewFinish = async (req, res) => {
     const { user_id } = req.body;

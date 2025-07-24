@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+
+import { Textarea } from "@/components/ui/textarea"; // Textarea 추가
+
 import {
   Mic, MicOff, Video, VideoOff, Play, Pause,
   SkipForward, Settings, HelpCircle, Clock
@@ -11,6 +14,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext"; // ✅ 유저 정보 가져오기
 import axios from "axios";
+
+import io, { Socket } from "socket.io-client";
+
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -30,9 +36,47 @@ const Interview = () => {
   const [questions, setQuestions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const [sentimentScore, setSentimentScore] = useState(100);
+  const [interviewId, setInterviewId] = useState<number | null>(null);
+  const [isReadyToAnalyze, setIsReadyToAnalyze] = useState(false);
+
+
   const wsRef = useRef<WebSocket | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      if (!user) {
+        setIsLoading(false);
+        setQuestions(["로그인이 필요합니다. 로그인 후 다시 시도해주세요."]);
+        return;
+      }
+      try {
+        const response = await axios.get(`/api/interview/questions/${user.id}`);
+        if (response.data.questions && response.data.questions.length > 0) {
+          setQuestions(response.data.questions);
+        } else {
+          setQuestions([]); // 질문이 없으면 빈 배열로 설정
+          toast({
+            title: "생성된 질문이 없습니다",
+            description: "설정 페이지에서 먼저 원하는 기업의 질문을 생성해주세요.",
+            duration: 5000,
+          });
+        }
+      } catch (error) {
+        console.error("질문 로딩 실패:", error);
+        setQuestions(["질문을 불러오는 데 실패했습니다. 페이지를 새로고침 해주세요."]);
+        toast({
+          title: "질문 로딩 실패",
+          description: "서버에서 질문을 가져오는 데 문제가 발생했습니다.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -98,6 +142,42 @@ const Interview = () => {
     if (isVideoOn) setupCamera();
   }, [isVideoOn, toast]);
 
+  // Sentiment analysis frame capture logic
+  useEffect(() => {
+    if (!isReadyToAnalyze || !isRecording) return;
+
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+
+    const analysisInterval = setInterval(async () => {
+      if (!isRecording || !videoRef.current || !context) {
+        return;
+      }
+
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      const image = canvas.toDataURL('image/jpeg');
+
+      try {
+        if (user && interviewId !== null) {
+          await axios.post(`/api/interview/analyze-frame`, { 
+            image,
+            interviewId,
+            questionNumber: currentQuestion + 1,
+            userId: user.id
+          });
+        }
+      } catch (error) {
+        console.error("Frame analysis failed:", error);
+      }
+    }, 1000); // 1초(1000ms)마다 분석 실행
+
+    return () => {
+      clearInterval(analysisInterval);
+    };
+  }, [isRecording, isReadyToAnalyze, user, interviewId, currentQuestion]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -159,33 +239,52 @@ const Interview = () => {
   };
 
   const stopSpeechRecognition = () => {
-    processorRef.current?.disconnect();
-    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
-    wsRef.current?.close();
-    processorRef.current = null;
-    mediaStreamRef.current = null;
-    wsRef.current = null;
+    // STT 비활성화로 내용 주석 처리
+    // processorRef.current?.disconnect();
+    // mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    // wsRef.current?.close();
+    // processorRef.current = null;
+    // mediaStreamRef.current = null;
+    // wsRef.current = null;
   };
 
   const startInterview = async () => {
     if (!user) return;
 
+try {
+    const response = await axios.post(`/api/interview/start`, { user_id: user.id });
+    if (response.data && response.data.interview_id) {
+        setInterviewId(response.data.interview_id);
+    }
+
     setIsInterviewStarted(true);
     setIsRecording(true);
     setTranscription("");
-    startSpeechRecognition();
+    // startSpeechRecognition(); // 필요 시 활성화
 
-    try {
-      const response = await fetch(`${BASE_URL}/api/interview/start`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id }) // ✅ 수정됨
-      });
-      console.log("✅ 면접 시작 요청 전송 완료");
-      if (!response.ok) {
-        const data = await response.json();
+    if (!socketRef.current) {
+        socketRef.current = io(`${BASE_URL}`);
+        socketRef.current.on('connect', () => {
+            console.log('Socket.IO connected');
+            socketRef.current?.emit('join', { userId: user.id });
+        });
+        socketRef.current.on('sentiment-update', (data: { newScore: string }) => {
+            setSentimentScore(parseFloat(data.newScore));
+        });
+        socketRef.current.on('disconnect', () => {
+            console.log('Socket.IO disconnected');
+        });
+    }
+
+    console.log("✅ 면접 시작 요청 전송 완료");
+    if (!response.status || response.status !== 200) {
+        const data = await response.data;
         console.error("❌ 응답 오류:", data);
-      }
+    }
+} catch (error) {
+    console.error("❌ 면접 시작 요청 실패:", error);
+}
+
     } catch (err) {
       console.error("❌ 면접 시작 요청 실패:", err);
       toast({
@@ -199,12 +298,14 @@ const Interview = () => {
       title: "면접이 시작되었습니다",
       description: "편안하게 답변해주세요. 언제든 일시정지할 수 있습니다."
     });
+
   };
 
   const toggleRecording = () => {
     const nextState = !isRecording;
     setIsRecording(nextState);
-    nextState ? startSpeechRecognition() : stopSpeechRecognition();
+    // STT 비활성화
+    // nextState ? startSpeechRecognition() : stopSpeechRecognition();
     toast({
       title: nextState ? "면접 재시작" : "면접 일시정지",
       description: nextState ? "면접이 재시작되었습니다." : "면접이 일시정지되었습니다."
@@ -212,25 +313,41 @@ const Interview = () => {
   };
 
   const handleNextQuestion = async () => {
-    if (!user) return;
+if (!user || interviewId === null) return;
+
+// 점수 초기화 API 호출
+try {
+    await axios.post(`/api/interview/reset-score`, { interviewId });
+    setSentimentScore(100);
+} catch (error) {
+    console.error("점수 초기화 실패:", error);
+    toast({
+        title: "점수 초기화 실패",
+        description: "다음 질문으로 넘어가기 전 점수를 초기화하는데 실패했습니다.",
+        variant: "destructive"
+    });
+    // 점수 초기화에 실패하더라도 일단 다음 질문으로 넘어가도록 처리할 수 있습니다.
+}
+
 
     const questionText = questions[currentQuestion];
     const answerText = transcription.trim();
 
     try {
       console.log("🟡 전송할 데이터:", {
-        question: questionText,
-        answer: answerText,
-        user_id: user.id // ✅ 수정됨
+          interviewId,
+          questionNumber: currentQuestion + 1,
+          questionText: questionText,
+          answerText: answerText,
+          user_id: user.id
       });
-      await fetch(`${BASE_URL}/api/interview/response`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: questionText,
-          answer: answerText,
-          user_id: user.id // ✅ 수정됨
-        })
+
+      await axios.post(`/api/interview/response`, {
+          interviewId,
+          questionNumber: currentQuestion + 1,
+          questionText: questionText,
+          answerText: answerText,
+          user_id: user.id
       });
       console.log(`✅ 질문 전송 완료: ${questionText}`);
     } catch (err) {
@@ -257,7 +374,36 @@ const Interview = () => {
         description: "수고하셨습니다. 결과를 분석 중입니다..."
       });
       stopSpeechRecognition();
+      socketRef.current?.disconnect();
       setTimeout(() => navigate("/results/1"), 2000);
+    }
+  };
+
+  const handleInterviewFinish = async () => {
+    if (!user) return;
+
+    try {
+      await fetch(`${BASE_URL}/api/interview/finish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: user.id })
+      });
+
+      toast({
+        title: "면접 종료",
+        description: "결과 페이지로 이동합니다..."
+      });
+
+      stopSpeechRecognition();
+      socketRef.current?.disconnect();
+      setTimeout(() => navigate("/results/1"), 2000);
+    } catch (err) {
+      console.error("❌ 인터뷰 종료 요청 실패:", err);
+      toast({
+        title: "종료 실패",
+        description: "서버에 종료 요청을 전송하지 못했습니다.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -369,7 +515,14 @@ const Interview = () => {
             </CardHeader>
             <CardContent>
               <div className="relative bg-slate-900 rounded-lg overflow-hidden">
-                <video ref={videoRef} autoPlay muted className="w-full h-64 md:h-80 object-cover" style={{ display: isVideoOn ? 'block' : 'none' }} />
+                <video 
+                  ref={videoRef} 
+                  autoPlay 
+                  muted 
+                  className="w-full h-64 md:h-80 object-cover" 
+                  style={{ display: isVideoOn ? 'block' : 'none' }}
+                  onLoadedData={() => setIsReadyToAnalyze(true)}
+                />
                 {!isVideoOn && (
                   <div className="w-full h-64 md:h-80 flex items-center justify-center text-white">
                     <div className="text-center">
@@ -385,7 +538,7 @@ const Interview = () => {
                   </div>
                 )}
                 <div className="absolute top-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
-                  AI 분석 중...
+                  감정 점수: {sentimentScore.toFixed(2)}
                 </div>
               </div>
 
@@ -423,27 +576,19 @@ const Interview = () => {
         <div>
           <Card>
             <CardHeader>
-              <CardTitle>실시간 음성 인식</CardTitle>
+              <CardTitle>답변 입력</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="min-h-32 p-4 bg-slate-50 rounded-lg border">
-                {transcription ? (
-                  <p className="text-slate-700">{transcription}</p>
-                ) : (
-                  <p className="text-slate-400 italic">
-                    {isRecording ? "음성을 인식하고 있습니다..." : "음성 인식이 일시정지되었습니다"}
-                  </p>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-4 mt-4">
-                <div className="text-center p-2 bg-green-50 rounded-lg">
-                  <div className="text-sm text-green-600">말하기 속도</div>
-                  <div className="text-lg font-bold text-green-700">적절</div>
-                </div>
-                <div className="text-center p-2 bg-blue-50 rounded-lg">
-                  <div className="text-sm text-blue-600">시선 처리</div>
-                  <div className="text-lg font-bold text-blue-700">양호</div>
-                </div>
+              <Textarea
+                value={transcription}
+                onChange={(e) => setTranscription(e.target.value)}
+                placeholder="이곳에 답변을 입력하세요. STT가 비활성화되었습니다."
+                className="min-h-32 text-base"
+                disabled={!isRecording}
+              />
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="ghost" onClick={() => setTranscription('')}>초기화</Button>
+                <Button onClick={handleNextQuestion}>입력</Button>
               </div>
             </CardContent>
           </Card>
