@@ -18,9 +18,9 @@ const io = new Server(server, {
 
 const PORT = 3000;
 
+const evaluationRoutes = require("./routes/evaluation");
 const { connectToSTTServer } = require("./utils/sttSocketManager");
 
-// CORS 설정 (기존 app.use(cors)는 socket.io 설정으로 대체 또는 병합)
 app.use(cors({
     origin: [
         "http://localhost:8080",
@@ -63,8 +63,11 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // 라우트 연결
 app.use("/api", require("./routes/auth"));
 app.use("/api/stt", require("./routes/sttRoutes"));
-app.use("/api/interview", require("./routes/interview")); // ✅ 인터뷰 응답 수신 라우트 추가
-app.use("/api", require("./routes/company")); // 추가
+
+app.use("/api/interview", require("./routes/interview"));
+app.use("/api", require("./routes/company"));
+app.use("/api/evaluation", evaluationRoutes); // ✅ 수정: /api 아래에 evaluation 라우트
+
 app.use("/", require("./routes/health"));
 
 // WebSocket STT 서버 연결
