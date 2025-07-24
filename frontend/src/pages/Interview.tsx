@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea"; // Textarea 추가
 import {
   Mic, MicOff, Video, VideoOff, Play, Pause,
   SkipForward, Settings, HelpCircle, Clock
@@ -200,12 +201,13 @@ const Interview = () => {
   };
 
   const stopSpeechRecognition = () => {
-    processorRef.current?.disconnect();
-    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
-    wsRef.current?.close();
-    processorRef.current = null;
-    mediaStreamRef.current = null;
-    wsRef.current = null;
+    // STT 비활성화로 내용 주석 처리
+    // processorRef.current?.disconnect();
+    // mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    // wsRef.current?.close();
+    // processorRef.current = null;
+    // mediaStreamRef.current = null;
+    // wsRef.current = null;
   };
 
   const startInterview = async () => {
@@ -220,7 +222,8 @@ const Interview = () => {
       setIsInterviewStarted(true);
       setIsRecording(true);
       setTranscription("");
-      startSpeechRecognition();
+      // STT 비활성화
+      // startSpeechRecognition();
 
       if (!socketRef.current) {
         socketRef.current = io(`${BASE_URL}`);
@@ -251,7 +254,8 @@ const Interview = () => {
   const toggleRecording = () => {
     const nextState = !isRecording;
     setIsRecording(nextState);
-    nextState ? startSpeechRecognition() : stopSpeechRecognition();
+    // STT 비활성화
+    // nextState ? startSpeechRecognition() : stopSpeechRecognition();
     toast({
       title: nextState ? "면접 재시작" : "면접 일시정지",
       description: nextState ? "면접이 재시작되었습니다." : "면접이 일시정지되었습니다."
@@ -485,27 +489,19 @@ const Interview = () => {
         <div>
           <Card>
             <CardHeader>
-              <CardTitle>실시간 음성 인식</CardTitle>
+              <CardTitle>답변 입력</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="min-h-32 p-4 bg-slate-50 rounded-lg border">
-                {transcription ? (
-                  <p className="text-slate-700">{transcription}</p>
-                ) : (
-                  <p className="text-slate-400 italic">
-                    {isRecording ? "음성을 인식하고 있습니다..." : "음성 인식이 일시정지되었습니다"}
-                  </p>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-4 mt-4">
-                <div className="text-center p-2 bg-green-50 rounded-lg">
-                  <div className="text-sm text-green-600">말하기 속도</div>
-                  <div className="text-lg font-bold text-green-700">적절</div>
-                </div>
-                <div className="text-center p-2 bg-blue-50 rounded-lg">
-                  <div className="text-sm text-blue-600">시선 처리</div>
-                  <div className="text-lg font-bold text-blue-700">양호</div>
-                </div>
+              <Textarea
+                value={transcription}
+                onChange={(e) => setTranscription(e.target.value)}
+                placeholder="이곳에 답변을 입력하세요. STT가 비활성화되었습니다."
+                className="min-h-32 text-base"
+                disabled={!isRecording}
+              />
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="ghost" onClick={() => setTranscription('')}>초기화</Button>
+                <Button onClick={handleNextQuestion}>입력</Button>
               </div>
             </CardContent>
           </Card>

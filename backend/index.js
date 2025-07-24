@@ -56,7 +56,9 @@ io.on('connection', (socket) => {
 
 app.set('io', io); // app 객체에 io 인스턴스 저장
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
 
 // 라우트 연결
 app.use("/api", require("./routes/auth"));
