@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 
 const {
-
     generateQuestions,
     getQuestions,
     receiveInterviewStart,
@@ -19,7 +18,6 @@ router.post("/start", receiveInterviewStart);
 router.post("/generate-questions", upload.single("resume"), generateQuestions);
 router.post("/response", receiveInterviewResponse);
 router.post("/finish", receiveInterviewFinish);
-
 
 // 감정 분석을 위한 프레임 처리 라우트
 router.post("/analyze-frame", analyzeFrame);

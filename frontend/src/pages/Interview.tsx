@@ -4,9 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-
 import { Textarea } from "@/components/ui/textarea"; // Textarea 추가
-
 import {
   Mic, MicOff, Video, VideoOff, Play, Pause,
   SkipForward, Settings, HelpCircle, Clock
@@ -14,9 +12,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext"; // ✅ 유저 정보 가져오기
 import axios from "axios";
-
 import io, { Socket } from "socket.io-client";
-
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -35,48 +31,14 @@ const Interview = () => {
   const [isInterviewStarted, setIsInterviewStarted] = useState(false);
   const [questions, setQuestions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
   const [sentimentScore, setSentimentScore] = useState(100);
   const [interviewId, setInterviewId] = useState<number | null>(null);
   const [isReadyToAnalyze, setIsReadyToAnalyze] = useState(false);
-
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const socketRef = useRef<Socket | null>(null);
-
-  useEffect(() => {
-    const fetchQuestions = async () => {
-      if (!user) {
-        setIsLoading(false);
-        setQuestions(["로그인이 필요합니다. 로그인 후 다시 시도해주세요."]);
-        return;
-      }
-      try {
-        const response = await axios.get(`/api/interview/questions/${user.id}`);
-        if (response.data.questions && response.data.questions.length > 0) {
-          setQuestions(response.data.questions);
-        } else {
-          setQuestions([]); // 질문이 없으면 빈 배열로 설정
-          toast({
-            title: "생성된 질문이 없습니다",
-            description: "설정 페이지에서 먼저 원하는 기업의 질문을 생성해주세요.",
-            duration: 5000,
-          });
-        }
-      } catch (error) {
-        console.error("질문 로딩 실패:", error);
-        setQuestions(["질문을 불러오는 데 실패했습니다. 페이지를 새로고침 해주세요."]);
-        toast({
-          title: "질문 로딩 실패",
-          description: "서버에서 질문을 가져오는 데 문제가 발생했습니다.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
 
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -251,39 +213,38 @@ const Interview = () => {
   const startInterview = async () => {
     if (!user) return;
 
-try {
-    const response = await axios.post(`/api/interview/start`, { user_id: user.id });
-    if (response.data && response.data.interview_id) {
+    try {
+      const response = await axios.post(`/api/interview/start`, { user_id: user.id });
+      if (response.data && response.data.interview_id) {
         setInterviewId(response.data.interview_id);
-    }
+      }
+      
+      setIsInterviewStarted(true);
+      setIsRecording(true);
+      setTranscription("");
+      // STT 비활성화
+      // startSpeechRecognition();
 
-    setIsInterviewStarted(true);
-    setIsRecording(true);
-    setTranscription("");
-    // startSpeechRecognition(); // 필요 시 활성화
-
-    if (!socketRef.current) {
+      if (!socketRef.current) {
         socketRef.current = io(`${BASE_URL}`);
         socketRef.current.on('connect', () => {
-            console.log('Socket.IO connected');
-            socketRef.current?.emit('join', { userId: user.id });
+          console.log('Socket.IO connected');
+          socketRef.current?.emit('join', { userId: user.id });
         });
         socketRef.current.on('sentiment-update', (data: { newScore: string }) => {
-            setSentimentScore(parseFloat(data.newScore));
+          setSentimentScore(parseFloat(data.newScore));
         });
         socketRef.current.on('disconnect', () => {
-            console.log('Socket.IO disconnected');
+          console.log('Socket.IO disconnected');
         });
-    }
+      }
+      
+      console.log("✅ 면접 시작 요청 전송 완료");
 
-    console.log("✅ 면접 시작 요청 전송 완료");
-    if (!response.status || response.status !== 200) {
-        const data = await response.data;
-        console.error("❌ 응답 오류:", data);
-    }
-} catch (error) {
-    console.error("❌ 면접 시작 요청 실패:", error);
-}
+      toast({
+        title: "면접이 시작되었습니다",
+        description: "편안하게 답변해주세요. 언제든 일시정지할 수 있습니다."
+      });
 
     } catch (err) {
       console.error("❌ 면접 시작 요청 실패:", err);
@@ -293,12 +254,6 @@ try {
         variant: "destructive"
       });
     }
-
-    toast({
-      title: "면접이 시작되었습니다",
-      description: "편안하게 답변해주세요. 언제든 일시정지할 수 있습니다."
-    });
-
   };
 
   const toggleRecording = () => {
@@ -313,41 +268,31 @@ try {
   };
 
   const handleNextQuestion = async () => {
-if (!user || interviewId === null) return;
+    if (!user || interviewId === null) return;
 
-// 점수 초기화 API 호출
-try {
-    await axios.post(`/api/interview/reset-score`, { interviewId });
-    setSentimentScore(100);
-} catch (error) {
-    console.error("점수 초기화 실패:", error);
-    toast({
+    // 점수 초기화 API 호출
+    try {
+      await axios.post(`/api/interview/reset-score`, { interviewId });
+      setSentimentScore(100);
+    } catch (error) {
+      console.error("점수 초기화 실패:", error);
+      toast({
         title: "점수 초기화 실패",
         description: "다음 질문으로 넘어가기 전 점수를 초기화하는데 실패했습니다.",
         variant: "destructive"
-    });
-    // 점수 초기화에 실패하더라도 일단 다음 질문으로 넘어가도록 처리할 수 있습니다.
-}
-
+      });
+      // 점수 초기화에 실패하더라도 일단 다음 질문으로 넘어가도록 처리할 수 있습니다.
+    }
 
     const questionText = questions[currentQuestion];
     const answerText = transcription.trim();
 
     try {
-      console.log("🟡 전송할 데이터:", {
-          interviewId,
-          questionNumber: currentQuestion + 1,
-          questionText: questionText,
-          answerText: answerText,
-          user_id: user.id
-      });
-
       await axios.post(`/api/interview/response`, {
-          interviewId,
-          questionNumber: currentQuestion + 1,
-          questionText: questionText,
-          answerText: answerText,
-          user_id: user.id
+        interviewId,
+        questionNumber: currentQuestion + 1,
+        questionText: questionText,
+        answerText: answerText
       });
       console.log(`✅ 질문 전송 완료: ${questionText}`);
     } catch (err) {
@@ -396,33 +341,6 @@ try {
 
       stopSpeechRecognition();
       socketRef.current?.disconnect();
-      setTimeout(() => navigate("/results/1"), 2000);
-    } catch (err) {
-      console.error("❌ 인터뷰 종료 요청 실패:", err);
-      toast({
-        title: "종료 실패",
-        description: "서버에 종료 요청을 전송하지 못했습니다.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleInterviewFinish = async () => {
-    if (!user) return;
-
-    try {
-      await fetch(`${BASE_URL}/api/interview/finish`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id })
-      });
-
-      toast({
-        title: "면접 종료",
-        description: "결과 페이지로 이동합니다..."
-      });
-
-      stopSpeechRecognition();
       setTimeout(() => navigate("/results/1"), 2000);
     } catch (err) {
       console.error("❌ 인터뷰 종료 요청 실패:", err);
