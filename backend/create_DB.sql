@@ -45,6 +45,7 @@ CREATE TABLE interview_session (
         TIMESTAMPDIFF(MINUTE, start_time, end_time)
     ) STORED,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    sentiment_score DECIMAL(5, 2) DEFAULT 100.00,
     FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE CASCADE
 );
 
@@ -121,6 +122,38 @@ CREATE TABLE total_result (
     total_score FLOAT,
     final_feedback TEXT,
     reason_summary TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (interview_id) REFERENCES interview_session(interview_id) ON DELETE CASCADE
+);
+
+-- user_question 테이블 생성
+CREATE TABLE user_question (
+    question_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    question_text TEXT,
+    is_custom BOOLEAN DEFAULT FALSE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user_info(user_id)
+);
+
+-- emotion_score 테이블 생성
+CREATE TABLE emotion_score (
+    emotion_score_id INT AUTO_INCREMENT PRIMARY KEY,
+    interview_id INT,
+    question_number INT,
+    score_reason VARCHAR(255),
+    total_score DECIMAL(5, 2),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (interview_id) REFERENCES interview_session(interview_id) ON DELETE CASCADE
+);
+
+-- answer_score 테이블 생성
+CREATE TABLE answer_score (
+    answer_score_id INT AUTO_INCREMENT PRIMARY KEY,
+    interview_id INT,
+    question_number INT,
+    question_text TEXT,
+    answer_text TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (interview_id) REFERENCES interview_session(interview_id) ON DELETE CASCADE
 );
