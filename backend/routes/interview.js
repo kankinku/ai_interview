@@ -10,10 +10,12 @@ const {
     analyzeFrame,
     resetSentimentScore,
     upload,
+    getRecentInterviews,
 } = require("../controllers/interviewController");
 
 // 라우트 등록
 router.get("/questions/:user_id", getQuestions);
+router.get("/interviews/:userId", getRecentInterviews); // 새로운 라우트
 router.post("/start", receiveInterviewStart);
 router.post("/generate-questions", upload.single("resume"), generateQuestions);
 router.post("/response", receiveInterviewResponse);

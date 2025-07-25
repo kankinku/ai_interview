@@ -19,6 +19,8 @@ const {
     generateInterviewQuestions,
 } = require("../modules/interview-helper");
 
+const { conductFinalEvaluation } = require("../modules/interviewEvaluation");
+
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, path.join(__dirname, "..", "uploads"));
@@ -270,34 +272,84 @@ exports.receiveInterviewFinish = async (req, res) => {
         return res.status(400).json({ error: "user_id가 필요합니다." });
     }
 
+    const connection = await db.getConnection();
     try {
-        const [rows] = await db.query(
+        await connection.beginTransaction();
+
+        const [rows] = await connection.query(
             `SELECT interview_id FROM interview_session 
-             WHERE user_id = ? 
+             WHERE user_id = ? AND end_time IS NULL
              ORDER BY start_time DESC 
              LIMIT 1`,
             [user_id]
         );
 
         if (rows.length === 0) {
-            return res.status(404).json({ error: "인터뷰 세션을 찾을 수 없습니다." });
+            await connection.rollback();
+            return res.status(404).json({ error: "진행 중인 인터뷰 세션을 찾을 수 없습니다." });
         }
 
         const interview_id = rows[0].interview_id;
         const endTime = new Date(); // 현재 시간
 
-        // status 제거하고 end_time만 갱신
-        await db.query(
+        await connection.query(
             `UPDATE interview_session 
              SET end_time = ?
              WHERE interview_id = ?`,
             [endTime, interview_id]
         );
+        
+        console.log(`✅ 면접 세션 종료 처리 완료 (interview_id: ${interview_id})`);
+        
+        await connection.commit();
+        
+        // 면접이 정상적으로 종료되었으므로, 백그라운드에서 최종 평가를 수행합니다.
+        // 클라이언트에게는 즉시 응답을 보냅니다.
+        res.status(200).json({ message: "면접이 성공적으로 종료되었습니다. 곧 평가 결과가 생성됩니다.", interview_id });
 
-        console.log("✅ 면접 종료 처리 완료");
-        res.status(200).json({ message: "면접 종료 저장 완료" });
+        // 평가 함수를 비동기적으로 호출 (await 없이)
+        conductFinalEvaluation(interview_id).catch(err => {
+            console.error(`❌ interview_id: ${interview_id} 최종 평가 중 오류 발생:`, err);
+        });
+
     } catch (err) {
+        await connection.rollback();
         console.error("❌ 면접 종료 처리 실패:", err);
+        res.status(500).json({ error: "서버 오류" });
+    } finally {
+        connection.release();
+    }
+};
+
+exports.getRecentInterviews = async (req, res) => {
+    const { userId } = req.params;
+
+    if (!userId) {
+        return res.status(400).json({ error: "사용자 ID가 필요합니다." });
+    }
+
+    try {
+        const [rows] = await db.query(
+            `SELECT 
+                interview_id,
+                user_id,
+                learning_field as position,
+                sentiment_score as score,
+                CASE 
+                    WHEN end_time IS NOT NULL THEN 'completed'
+                    ELSE 'in_progress'
+                END as status,
+                DATE_FORMAT(start_time, '%Y-%m-%d') as date,
+                duration_minutes
+             FROM interview_session 
+             WHERE user_id = ? 
+             ORDER BY start_time DESC 
+             LIMIT 5`,
+            [userId]
+        );
+        res.status(200).json(rows);
+    } catch (err) {
+        console.error("❌ 최근 면접 기록 조회 실패:", err);
         res.status(500).json({ error: "서버 오류" });
     }
 };

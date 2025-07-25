@@ -33,17 +33,33 @@ const Settings = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [profile, setProfile] = useState({
-    name: "김면접자",
-    email: "interview@example.com",
-    position: "프론트엔드 개발자",
-    experience: "3-5년",
+    name: "",
+    email: "",
+    position: "",
+    experience: "",
     targetCompany: "",
-    targetSalary: "5000-7000만원"
+    targetSalary: ""
   });
 
   const [companies, setCompanies] = useState<{ company_id: number; company_name: string; talent_url: string | null }[]>([]);
 
   useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (user) {
+        try {
+          const response = await axios.get(`/api/auth/profile/${user.id}`);
+          setProfile(prevProfile => ({ ...prevProfile, ...response.data }));
+        } catch (error) {
+          console.error("사용자 프로필 로딩 실패:", error);
+          toast({
+            title: "프로필 로딩 실패",
+            description: "사용자 정보를 가져오는 데 문제가 발생했습니다.",
+            variant: "destructive",
+          });
+        }
+      }
+    };
+
     const fetchCompanies = async () => {
       try {
         const response = await axios.get("/api/companies");
@@ -57,8 +73,9 @@ const Settings = () => {
         });
       }
     };
+    fetchUserProfile();
     fetchCompanies();
-  }, [toast]);
+  }, [toast, user]);
 
   const handleTargetCompanyChange = (value: string) => {
     const selectedCompany = companies.find(c => c.company_name === value);
@@ -96,11 +113,36 @@ const Settings = () => {
     volume: 50
   });
 
-  const handleProfileUpdate = () => {
-    toast({
-      title: "프로필이 업데이트되었습니다",
-      description: "변경사항이 성공적으로 저장되었습니다."
-    });
+  const handleProfileUpdate = async () => {
+    if (!user) {
+      toast({
+        title: "오류",
+        description: "로그인이 필요합니다.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await axios.put("/api/auth/profile", {
+        userId: user.id,
+        ...profile,
+      });
+
+      if (response.status === 200) {
+        toast({
+          title: "프로필이 업데이트되었습니다",
+          description: "변경사항이 성공적으로 저장되었습니다."
+        });
+      }
+    } catch (error) {
+      console.error("프로필 업데이트 실패:", error);
+      toast({
+        title: "프로필 업데이트 실패",
+        description: "서버와 통신 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleCompanyInfoSave = async () => {

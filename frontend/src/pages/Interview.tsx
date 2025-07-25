@@ -320,19 +320,32 @@ const Interview = () => {
       });
       stopSpeechRecognition();
       socketRef.current?.disconnect();
-      setTimeout(() => navigate("/results/1"), 2000);
+      handleInterviewFinish(true); // 마지막 질문이면 자동으로 종료 로직 호출
     }
   };
 
-  const handleInterviewFinish = async () => {
-    if (!user) return;
+  const handleInterviewFinish = async (isAutoFinish = false) => {
+    if (!user || interviewId === null) return;
 
     try {
-      await fetch(`${BASE_URL}/api/interview/finish`, {
+      // isAutoFinish가 아닐 때만 응답을 전송 (마지막 질문 후 자동종료 시 중복 전송 방지)
+      if (!isAutoFinish) {
+        const questionText = questions[currentQuestion];
+        const answerText = transcription.trim();
+        await axios.post(`/api/interview/response`, {
+            interviewId,
+            questionNumber: currentQuestion + 1,
+            questionText: questionText,
+            answerText: answerText
+        });
+      }
+
+      const response = await fetch(`${BASE_URL}/api/interview/finish`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: user.id })
       });
+      const data = await response.json();
 
       toast({
         title: "면접 종료",
@@ -341,7 +354,8 @@ const Interview = () => {
 
       stopSpeechRecognition();
       socketRef.current?.disconnect();
-      setTimeout(() => navigate("/results/1"), 2000);
+      // 서버에서 받은 interview_id로 결과 페이지 이동
+      setTimeout(() => navigate(`/results/${data.interview_id}`), 2000);
     } catch (err) {
       console.error("❌ 인터뷰 종료 요청 실패:", err);
       toast({
@@ -478,7 +492,7 @@ const Interview = () => {
                         다음 질문
                       </Button>
                     ) : (
-                      <Button onClick={handleInterviewFinish} variant="outline" size="lg">
+                      <Button onClick={() => handleInterviewFinish(false)} variant="outline" size="lg">
                         <SkipForward className="mr-2 h-5 w-5" />
                         인터뷰 종료
                       </Button>

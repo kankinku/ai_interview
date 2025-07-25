@@ -10,11 +10,14 @@ function connectToSTTServer() {
     });
 
     sttSocket.on("close", () => {
-        console.log("🔌 STT 서버 연결 종료됨");
+        console.log("🔌 STT 서버 연결 종료됨. 5초 후 재연결 시도...");
+        sttSocket = null; // 소켓 참조 제거
+        setTimeout(connectToSTTServer, 5000);
     });
 
     sttSocket.on("error", (err) => {
-        console.error("❌ STT WebSocket 오류:", err);
+        console.error("❌ STT WebSocket 오류:", err.message);
+        // 'close' 이벤트가 발생하므로, 재연결은 close 핸들러에서 처리됩니다.
     });
 
     sttSocket.on("message", (msg) => {

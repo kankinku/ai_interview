@@ -15,9 +15,10 @@ import {
   BarChart3,
   Brain
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Interview = {
-  id: number;
+  interview_id: number;
   position: string;
   score: number;
   status: string;
@@ -27,16 +28,37 @@ type Interview = {
   preferred_language: string;
 };
 
+type DashboardStats = {
+  totalInterviews: number;
+  averageScore: number;
+  weeklyStudyHours: number;
+};
+
 const Dashboard = () => {
+  const { user } = useAuth();
   const [selectedGoal, setSelectedGoal] = useState(85);
   const [recentInterviews, setRecentInterviews] = useState<Interview[]>([]);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalInterviews: 0,
+    averageScore: 0,
+    weeklyStudyHours: 0,
+  });
 
   useEffect(() => {
-    axios
-      .get("/api/interviews")
-      .then((res) => setRecentInterviews(res.data))
-      .catch((err) => console.error("면접 데이터 불러오기 실패:", err));
-  }, []);
+    if (user) {
+      // 면접 기록 불러오기
+      axios
+        .get(`/api/interview/interviews/${user.id}`) // 수정된 경로
+        .then((res) => setRecentInterviews(res.data))
+        .catch((err) => console.error("면접 데이터 불러오기 실패:", err));
+
+      // 대시보드 통계 불러오기
+      axios
+        .get(`/api/dashboard/stats/${user.id}`)
+        .then((res) => setStats(res.data))
+        .catch((err) => console.error("대시보드 통계 불러오기 실패:", err));
+    }
+  }, [user]);
 
   const skillAreas = [
     { name: "기술 역량", score: 85, color: "bg-blue-500" },
@@ -44,6 +66,9 @@ const Dashboard = () => {
     { name: "문제해결", score: 80, color: "bg-purple-500" },
     { name: "리더십", score: 72, color: "bg-orange-500" }
   ];
+
+  const achievementRate = stats.averageScore && selectedGoal ? Math.round((stats.averageScore / selectedGoal) * 100) : 0;
+
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -60,7 +85,7 @@ const Dashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-600">총 면접 횟수</p>
-                <p className="text-2xl font-bold text-slate-900">12</p>
+                <p className="text-2xl font-bold text-slate-900">{stats.totalInterviews}</p>
               </div>
               <Brain className="h-8 w-8 text-blue-600" />
             </div>
@@ -72,7 +97,7 @@ const Dashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-600">평균 점수</p>
-                <p className="text-2xl font-bold text-slate-900">78.5</p>
+                <p className="text-2xl font-bold text-slate-900">{stats.averageScore}</p>
               </div>
               <BarChart3 className="h-8 w-8 text-green-600" />
             </div>
@@ -84,7 +109,7 @@ const Dashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-600">목표 달성률</p>
-                <p className="text-2xl font-bold text-slate-900">92%</p>
+                <p className="text-2xl font-bold text-slate-900">{achievementRate}%</p>
               </div>
               <Target className="h-8 w-8 text-purple-600" />
             </div>
@@ -96,7 +121,7 @@ const Dashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-600">이번 주 학습시간</p>
-                <p className="text-2xl font-bold text-slate-900">4.5h</p>
+                <p className="text-2xl font-bold text-slate-900">{stats.weeklyStudyHours}h</p>
               </div>
               <Clock className="h-8 w-8 text-orange-600" />
             </div>
@@ -140,7 +165,7 @@ const Dashboard = () => {
               <div className="space-y-4">
                 {recentInterviews.map((interview) => (
                   <div
-                    key={interview.id}
+                    key={interview.interview_id}
                     className="flex items-center justify-between p-4 border rounded-lg hover:bg-slate-50 transition-colors"
                   >
                     <div className="flex-1">
@@ -164,7 +189,7 @@ const Dashboard = () => {
                         {interview.score}점
                       </div>
                       <Link 
-                        to={`/results/${interview.id}`}
+                        to={`/results/${interview.interview_id}`}
                         className="text-sm text-blue-600 hover:text-blue-700"
                       >
                         결과 보기
@@ -193,9 +218,9 @@ const Dashboard = () => {
                   <span className="text-sm text-slate-600">현재 목표</span>
                   <span className="font-bold text-lg">{selectedGoal}점</span>
                 </div>
-                <Progress value={(78.5 / selectedGoal) * 100} className="h-2" />
+                <Progress value={achievementRate} className="h-2" />
                 <p className="text-xs text-slate-500">
-                  목표까지 {selectedGoal - 78.5}점 남았습니다
+                  목표까지 {Math.max(0, selectedGoal - stats.averageScore).toFixed(1)}점 남았습니다
                 </p>
                 <div className="flex gap-2">
                   {[80, 85, 90].map((goal) => (

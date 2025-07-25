@@ -76,3 +76,108 @@ exports.signup = async (req, res) => {
         res.status(500).json({ error: "서버 오류" });
     }
 };
+
+const parseCareerYears = (careerString) => {
+    if (!careerString) return 0;
+    if (careerString.includes('신입')) return 0;
+    const match = careerString.match(/(\d+)/);
+    return match ? parseInt(match[0], 10) : 0;
+};
+
+const parseSalary = (salaryString) => {
+    if (!salaryString) return null;
+    const match = salaryString.match(/(\d+)/);
+    return match ? parseInt(match[0], 10) * 10000 : null;
+};
+
+
+exports.updateProfile = async (req, res) => {
+    const { userId, name, email, position, experience, targetCompany, targetSalary } = req.body;
+
+    if (!userId) {
+        return res.status(400).json({ error: "사용자 ID가 필요합니다." });
+    }
+
+    const career_years = parseCareerYears(experience);
+    const desired_salary = parseSalary(targetSalary);
+
+    try {
+        const [result] = await db.execute(
+            `UPDATE user_info 
+             SET user_name = ?, email = ?, learning_field = ?, career_years = ?, desired_salary = ?
+             WHERE user_id = ?`,
+            [name, email, position, career_years, desired_salary, userId]
+        );
+        
+        // targetCompany는 company_info 테이블에 업데이트 해야 할 수도 있습니다.
+        // 우선 user_info에 관련 필드가 없으므로 여기서는 처리하지 않습니다.
+        // 만약 company_info와 user_info를 연결하는 로직이 필요하다면 추가 구현이 필요합니다.
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: "사용자를 찾을 수 없습니다." });
+        }
+
+        res.json({ message: "프로필이 성공적으로 업데이트되었습니다." });
+    } catch (err) {
+        console.error("프로필 업데이트 오류:", err);
+        res.status(500).json({ error: "서버 오류" });
+    }
+};
+
+exports.getProfile = async (req, res) => {
+    const { userId } = req.params;
+
+    if (!userId) {
+        return res.status(400).json({ error: "사용자 ID가 필요합니다." });
+    }
+
+    try {
+        const [rows] = await db.execute(
+            `SELECT user_name, email, learning_field, career_years, desired_salary 
+             FROM user_info 
+             WHERE user_id = ?`,
+            [userId]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: "사용자를 찾을 수 없습니다." });
+        }
+
+        const userProfile = rows[0];
+
+        // 연봉 데이터를 문자열로 변환 (예: 60000000 -> "5000-7000만원")
+        const formatSalary = (salary) => {
+            if (!salary) return "";
+            const sal = salary / 10000;
+            if (sal <= 3000) return "3000만원 이하";
+            if (sal <= 4000) return "3000-4000만원";
+            if (sal <= 5000) return "4000-5000만원";
+            if (sal <= 7000) return "5000-7000만원";
+            return "7000만원 이상";
+        };
+        
+        // 경력 데이터를 문자열로 변환 (예: 4 -> "3-5년")
+        const formatExperience = (years) => {
+            if (years === 0) return "신입";
+            if (years >= 1 && years < 3) return "1-3년";
+            if (years >= 3 && years < 5) return "3-5년";
+            if (years >= 5 && years < 10) return "5-10년";
+            if (years >= 10) return "10년 이상";
+            return "신입";
+        };
+
+
+        res.json({
+            name: userProfile.user_name,
+            email: userProfile.email,
+            position: userProfile.learning_field,
+            experience: formatExperience(userProfile.career_years),
+            targetSalary: formatSalary(userProfile.desired_salary),
+            // targetCompany는 별도 테이블 또는 로직 필요
+        });
+
+    } catch (err) {
+        console.error("프로필 조회 오류:", err);
+        res.status(500).json({ error: "서버 오류" });
+    }
+};

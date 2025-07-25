@@ -35,7 +35,7 @@ ${joinedAnswers}
 `;
 
     const response = await openai.chat.completions.create({
-    model: "gpt-4",
+    model: "gpt-3.5-turbo",
     messages: [
     { role: "system", content: "당신은 인사 담당 면접 평가자입니다." },
     { role: "user", content: prompt },
