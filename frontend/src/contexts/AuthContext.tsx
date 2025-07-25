@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const BASE_URL = "http://localhost:3000";
 
     const signUp = async (email: string, password: string, name: string) => {
-        const res = await fetch(`${BASE_URL}/api/signup`, {
+        const res = await fetch(`${BASE_URL}/api/auth/signup`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email, password, name }),
@@ -45,7 +45,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const login = async (email: string, password: string) => {
-        const res = await fetch(`${BASE_URL}/api/login`, {
+        const res = await fetch(`${BASE_URL}/api/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email, password }),
