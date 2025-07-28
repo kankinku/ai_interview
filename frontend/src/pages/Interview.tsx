@@ -35,6 +35,7 @@ const Interview = () => {
   const [sentimentScore, setSentimentScore] = useState(100);
   const [interviewId, setInterviewId] = useState<number | null>(null);
   const [isReadyToAnalyze, setIsReadyToAnalyze] = useState(false);
+  const [answerStartTime, setAnswerStartTime] = useState<number | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -87,6 +88,12 @@ const Interview = () => {
     }
     return () => clearInterval(interval);
   }, [isRecording, timeRemaining]);
+
+  useEffect(() => {
+    if (isRecording) {
+      setAnswerStartTime(Date.now());
+    }
+  }, [isRecording, currentQuestion]);
 
   useEffect(() => {
     const setupCamera = async () => {
@@ -223,6 +230,7 @@ const Interview = () => {
         setIsInterviewStarted(true);
         setIsRecording(true);
         setTranscription("");
+        setAnswerStartTime(Date.now());
 
         if (!socketRef.current) {
           socketRef.current = io(`${BASE_URL}`);
@@ -288,13 +296,15 @@ const Interview = () => {
     const questionText = questions[currentQuestion];
     // manualAnswer에 값이 있으면 그 값을, 없으면 transcription(STT) 값을 사용
     const answerText = manualAnswer.trim() !== '' ? manualAnswer.trim() : transcription.trim();
+    const answerTime = answerStartTime ? Math.round((Date.now() - answerStartTime) / 1000) : 0;
 
     try {
       await axios.post(`/api/interview/response`, {
         interviewId,
         questionNumber: currentQuestion + 1,
         questionText: questionText,
-        answerText: answerText
+        answerText: answerText,
+        answerTime: answerTime
       });
       console.log(`✅ 질문 전송 완료: ${questionText}`);
     } catch (err) {
@@ -312,6 +322,7 @@ const Interview = () => {
       setTimeRemaining(180);
       setTranscription("");
       setManualAnswer(""); // 다음 질문으로 넘어가면 입력창 초기화
+      setAnswerStartTime(Date.now());
       toast({
         title: "다음 질문",
         description: `질문 ${currentQuestion + 2}번으로 이동합니다.`
@@ -335,11 +346,13 @@ const Interview = () => {
       if (!isAutoFinish) {
         const questionText = questions[currentQuestion];
         const answerText = manualAnswer.trim() !== '' ? manualAnswer.trim() : transcription.trim();
+        const answerTime = answerStartTime ? Math.round((Date.now() - answerStartTime) / 1000) : 0;
         await axios.post(`/api/interview/response`, {
             interviewId,
             questionNumber: currentQuestion + 1,
             questionText: questionText,
-            answerText: answerText
+            answerText: answerText,
+            answerTime: answerTime
         });
       }
 

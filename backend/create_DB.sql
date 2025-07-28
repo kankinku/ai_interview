@@ -141,17 +141,18 @@ CREATE TABLE emotion_score (
 
 -- answer_score 테이블 생성
 CREATE TABLE answer_score (
-    answer_score_id INT AUTO_INCREMENT PRIMARY KEY,
+    answer_id INT AUTO_INCREMENT PRIMARY KEY,
     interview_id INT,
-    question_number INT,
+    question_number INT NOT NULL,
     question_text TEXT,
     answer_text TEXT,
-    -- AI 분석 후 채워질 컬럼들
-    score INT DEFAULT NULL,              -- 답변 평가 점수
-    feedback TEXT DEFAULT NULL,          -- AI의 상세 피드백
-    strengths JSON DEFAULT NULL,         -- 강점 목록 (JSON)
-    improvements JSON DEFAULT NULL,      -- 개선점 목록 (JSON)
-    duration_seconds INT DEFAULT NULL,   -- 답변 소요 시간 (초)
+    answer_time INT,
+    score INT,
+    feedback TEXT,
+    strengths TEXT,
+    improvements JSON,
+    pacing_evaluation VARCHAR(20),
+    duration_seconds INT,
     
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (interview_id) REFERENCES interview_session(interview_id) ON DELETE CASCADE

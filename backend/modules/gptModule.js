@@ -48,8 +48,10 @@ ${JSON.stringify(combinedData, null, 2)}
   },
   "questionEvaluations": [
     {
+      "question_number": "평가하는 질문의 고유 번호 (number)",
       "question": "실제 질문 내용",
       "answer": "지원자의 답변 내용",
+      "emotion_summary": "해당 답변 중의 요약된 감정 상태 (string)",
       "score": "해당 답변에 대한 점수 (0-100)",
       "feedback": "답변 내용과 감정 분석 결과를 종합한 구체적인 피드백",
       "strengths": ["해당 답변에서 드러난 강점 1~2개"],

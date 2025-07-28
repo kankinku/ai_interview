@@ -32,6 +32,7 @@ interface QuestionAnalysis {
   feedback: string;
   strengths: string[];
   improvements: string[];
+  pacing: '성급함' | '적절함' | '느림' | null;
 }
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -312,6 +313,24 @@ const Results = () => {
                     </div>
 
                     <div className="flex items-center justify-between">
+                      <div className="text-sm text-slate-600">답변 속도</div>
+                      {questionAnalyses[selectedQuestion].pacing && (
+                        <Badge
+                          variant={
+                            questionAnalyses[selectedQuestion].pacing === '적절함' ? 'default' : 'destructive'
+                          }
+                          className={
+                            questionAnalyses[selectedQuestion].pacing === '적절함' ? 'bg-green-100 text-green-800' :
+                            questionAnalyses[selectedQuestion].pacing === '성급함' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                          }
+                        >
+                          {questionAnalyses[selectedQuestion].pacing}
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between">
                       <div className="text-sm text-slate-600">답변 점수</div>
                       <Badge variant="default" className="text-base">{questionAnalyses[selectedQuestion].score}점</Badge>
                     </div>
@@ -319,25 +338,6 @@ const Results = () => {
                     <div>
                       <h4 className="font-semibold text-slate-800 mb-2">AI 피드백</h4>
                       <p className="text-slate-600 leading-relaxed">{questionAnalyses[selectedQuestion].feedback}</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <h4 className="font-semibold text-green-700 mb-2">잘한 점</h4>
-                        <ul className="space-y-1">
-                          {questionAnalyses[selectedQuestion].strengths.map((s, i) => (
-                            <li key={i} className="text-sm text-slate-600">✓ {s}</li>
-                          ))}
-                        </ul>
-                      </div>
-                       <div>
-                        <h4 className="font-semibold text-orange-700 mb-2">개선할 점</h4>
-                        <ul className="space-y-1">
-                          {questionAnalyses[selectedQuestion].improvements.map((imp, i) => (
-                            <li key={i} className="text-sm text-slate-600">💡 {imp}</li>
-                          ))}
-                        </ul>
-                      </div>
                     </div>
 
                   </CardContent>

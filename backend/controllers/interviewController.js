@@ -243,17 +243,17 @@ exports.receiveInterviewStart = async (req, res) => {
 
 // 인터뷰 응답
 exports.receiveInterviewResponse = async (req, res) => {
-    const { interviewId, questionNumber, questionText, answerText } = req.body;
+    const { interviewId, questionNumber, questionText, answerText, answerTime } = req.body;
 
-    if (!interviewId || !questionNumber || !questionText || answerText === undefined) {
-        return res.status(400).json({ error: "필수 데이터(interviewId, questionNumber, questionText, answerText) 누락" });
+    if (!interviewId || !questionNumber || !questionText || answerText === undefined || !answerTime) {
+        return res.status(400).json({ error: "필수 데이터(interviewId, questionNumber, questionText, answerText, answerTime) 누락" });
     }
 
     try {
         await db.query(
-            `INSERT INTO answer_score (interview_id, question_number, question_text, answer_text)
-             VALUES (?, ?, ?, ?)`,
-            [interviewId, questionNumber, questionText, answerText]
+            `INSERT INTO answer_score (interview_id, question_number, question_text, answer_text, answer_time)
+             VALUES (?, ?, ?, ?, ?)`,
+            [interviewId, questionNumber, questionText, answerText, answerTime]
         );
 
         console.log("✅ 면접 응답 DB 저장 완료");

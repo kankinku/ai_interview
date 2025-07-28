@@ -128,6 +128,7 @@ exports.getQuestionAnalysis = async (req, res) => {
          feedback,
          strengths,
          improvements,
+         pacing_evaluation,
          duration_seconds
        FROM answer_score
        WHERE interview_id = ?
@@ -165,6 +166,7 @@ exports.getQuestionAnalysis = async (req, res) => {
         feedback: q.feedback,
         strengths: safeParse(q.strengths),
         improvements: safeParse(q.improvements),
+        pacing: q.pacing_evaluation,
       };
     });
 
