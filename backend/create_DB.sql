@@ -121,20 +121,12 @@ CREATE TABLE total_result (
     vital_score FLOAT,
     total_score FLOAT,
     final_feedback TEXT,
-    reason_summary TEXT,
+    strengths JSON, -- 강점 (JSON 배열)
+    reason_summary TEXT, -- 개선점 요약
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (interview_id) REFERENCES interview_session(interview_id) ON DELETE CASCADE
 );
 
--- user_question 테이블 생성
-CREATE TABLE user_question (
-    question_id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT,
-    question_text TEXT,
-    is_custom BOOLEAN DEFAULT FALSE,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES user_info(user_id)
-);
 
 -- emotion_score 테이블 생성
 CREATE TABLE emotion_score (
@@ -154,6 +146,26 @@ CREATE TABLE answer_score (
     question_number INT,
     question_text TEXT,
     answer_text TEXT,
+    -- AI 분석 후 채워질 컬럼들
+    score INT DEFAULT NULL,              -- 답변 평가 점수
+    feedback TEXT DEFAULT NULL,          -- AI의 상세 피드백
+    strengths JSON DEFAULT NULL,         -- 강점 목록 (JSON)
+    improvements JSON DEFAULT NULL,      -- 개선점 목록 (JSON)
+    duration_seconds INT DEFAULT NULL,   -- 답변 소요 시간 (초)
+    
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (interview_id) REFERENCES interview_session(interview_id) ON DELETE CASCADE
 );
+
+-- 답변의 Vector Embedding을 저장할 테이블
+CREATE TABLE answer_embeddings (
+    embedding_id INT AUTO_INCREMENT PRIMARY KEY,
+    answer_score_id INT NOT NULL,
+    user_id INT NOT NULL,
+    embedding JSON NOT NULL, -- 또는 BLOB
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (answer_score_id) REFERENCES answer_score(answer_score_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE CASCADE
+);
+
+-- evaluations 테이블은 total_result로 대체되었으므로 삭제합니다.

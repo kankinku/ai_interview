@@ -23,12 +23,15 @@ import {
   Upload,
   X,
   FileText,
-  Building2
+  Building2,
+  Info
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import axios from "axios";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { toast as sonnerToast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const Settings = () => {
   const { toast } = useToast();
@@ -295,6 +298,13 @@ const Settings = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative">
+      <Alert className="mb-8 border-blue-200 bg-blue-50 text-blue-800">
+        <Info className="h-4 w-4" />
+        <AlertTitle>질문 생성 안내</AlertTitle>
+        <AlertDescription>
+          프로필 저장과 기업 정보 저장 및 자기소개서를 입력하고 기업정보 저장을 완료하면 자동으로 질문이 생성됩니다.
+        </AlertDescription>
+      </Alert>
       {isGenerating && (
         <div className="absolute inset-0 bg-white bg-opacity-80 flex flex-col items-center justify-center z-50 rounded-lg">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900 mb-4"></div>

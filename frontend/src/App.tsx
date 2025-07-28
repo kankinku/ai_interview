@@ -15,6 +15,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
 import Navbar from "./components/Navbar";
+import Processing from "./pages/Processing";
 
 const queryClient = new QueryClient();
 
@@ -33,7 +34,8 @@ const App = () => (
               <Route path="/signup" element={<Signup />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/interview" element={<Interview />} />
-              <Route path="/results/:sessionId" element={<Results />} />
+              <Route path="/processing/:interviewId" element={<Processing />} />
+              <Route path="/results/:interviewId" element={<Results />} />
               <Route path="/improvement" element={<ImprovementPlan />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />

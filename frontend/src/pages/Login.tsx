@@ -22,8 +22,12 @@ const Login = () => {
         setError("");
 
         try {
-            await login(email, password);
-            navigate("/dashboard"); // 로그인 성공 후 이동할 경로
+            const { hasQuestions } = await login(email, password);
+            if (hasQuestions) {
+                navigate("/dashboard"); // 질문이 있으면 대시보드로
+            } else {
+                navigate("/settings"); // 질문이 없으면 설정 페이지로
+            }
         } catch (err: any) {
             setError(err.message || "로그인 중 오류가 발생했습니다.");
         } finally {

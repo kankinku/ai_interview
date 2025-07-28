@@ -28,6 +28,7 @@ const Interview = () => {
   const [isMicOn, setIsMicOn] = useState(true);
   const [timeRemaining, setTimeRemaining] = useState(180);
   const [transcription, setTranscription] = useState("");
+  const [manualAnswer, setManualAnswer] = useState(""); // 사용자가 직접 입력한 답변
   const [isInterviewStarted, setIsInterviewStarted] = useState(false);
   const [questions, setQuestions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -215,37 +216,37 @@ const Interview = () => {
 
     try {
       const response = await axios.post(`/api/interview/start`, { user_id: user.id });
+
       if (response.data && response.data.interview_id) {
-        setInterviewId(response.data.interview_id);
+        const newInterviewId = response.data.interview_id;
+        setInterviewId(newInterviewId);
+        setIsInterviewStarted(true);
+        setIsRecording(true);
+        setTranscription("");
+
+        if (!socketRef.current) {
+          socketRef.current = io(`${BASE_URL}`);
+          socketRef.current.on('connect', () => {
+            console.log('Socket.IO connected');
+            socketRef.current?.emit('join', { userId: user.id });
+          });
+          socketRef.current.on('sentiment-update', (data: { newScore: string }) => {
+            setSentimentScore(parseFloat(data.newScore));
+          });
+          socketRef.current.on('disconnect', () => {
+            console.log('Socket.IO disconnected');
+          });
+        }
+        
+        console.log("✅ 면접 시작 요청 전송 완료, ID:", newInterviewId);
+
+        toast({
+          title: "면접이 시작되었습니다",
+          description: "편안하게 답변해주세요. 언제든 일시정지할 수 있습니다."
+        });
+      } else {
+        throw new Error("서버로부터 면접 ID를 받지 못했습니다.");
       }
-      
-      setIsInterviewStarted(true);
-      setIsRecording(true);
-      setTranscription("");
-      // STT 비활성화
-      // startSpeechRecognition();
-
-      if (!socketRef.current) {
-        socketRef.current = io(`${BASE_URL}`);
-        socketRef.current.on('connect', () => {
-          console.log('Socket.IO connected');
-          socketRef.current?.emit('join', { userId: user.id });
-        });
-        socketRef.current.on('sentiment-update', (data: { newScore: string }) => {
-          setSentimentScore(parseFloat(data.newScore));
-        });
-        socketRef.current.on('disconnect', () => {
-          console.log('Socket.IO disconnected');
-        });
-      }
-      
-      console.log("✅ 면접 시작 요청 전송 완료");
-
-      toast({
-        title: "면접이 시작되었습니다",
-        description: "편안하게 답변해주세요. 언제든 일시정지할 수 있습니다."
-      });
-
     } catch (err) {
       console.error("❌ 면접 시작 요청 실패:", err);
       toast({
@@ -285,7 +286,8 @@ const Interview = () => {
     }
 
     const questionText = questions[currentQuestion];
-    const answerText = transcription.trim();
+    // manualAnswer에 값이 있으면 그 값을, 없으면 transcription(STT) 값을 사용
+    const answerText = manualAnswer.trim() !== '' ? manualAnswer.trim() : transcription.trim();
 
     try {
       await axios.post(`/api/interview/response`, {
@@ -309,6 +311,7 @@ const Interview = () => {
       setCurrentQuestion(currentQuestion + 1);
       setTimeRemaining(180);
       setTranscription("");
+      setManualAnswer(""); // 다음 질문으로 넘어가면 입력창 초기화
       toast({
         title: "다음 질문",
         description: `질문 ${currentQuestion + 2}번으로 이동합니다.`
@@ -318,20 +321,20 @@ const Interview = () => {
         title: "면접 완료!",
         description: "수고하셨습니다. 결과를 분석 중입니다..."
       });
-      stopSpeechRecognition();
-      socketRef.current?.disconnect();
-      handleInterviewFinish(true); // 마지막 질문이면 자동으로 종료 로직 호출
+      const finishedInterviewId = await handleInterviewFinish(true);
+      if (finishedInterviewId) {
+        navigate(`/processing/${finishedInterviewId}`); // 경로 변경
+      }
     }
   };
 
-  const handleInterviewFinish = async (isAutoFinish = false) => {
-    if (!user || interviewId === null) return;
+  const handleInterviewFinish = async (isAutoFinish = false): Promise<number | null> => {
+    if (!user || interviewId === null) return null;
 
     try {
-      // isAutoFinish가 아닐 때만 응답을 전송 (마지막 질문 후 자동종료 시 중복 전송 방지)
       if (!isAutoFinish) {
         const questionText = questions[currentQuestion];
-        const answerText = transcription.trim();
+        const answerText = manualAnswer.trim() !== '' ? manualAnswer.trim() : transcription.trim();
         await axios.post(`/api/interview/response`, {
             interviewId,
             questionNumber: currentQuestion + 1,
@@ -340,22 +343,20 @@ const Interview = () => {
         });
       }
 
-      const response = await fetch(`${BASE_URL}/api/interview/finish`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id })
+      const response = await axios.post(`${BASE_URL}/api/interview/finish`, { 
+        user_id: user.id 
       });
-      const data = await response.json();
-
-      toast({
-        title: "면접 종료",
-        description: "결과 페이지로 이동합니다..."
-      });
+      
+      const { interview_id } = response.data;
 
       stopSpeechRecognition();
       socketRef.current?.disconnect();
-      // 서버에서 받은 interview_id로 결과 페이지 이동
-      setTimeout(() => navigate(`/results/${data.interview_id}`), 2000);
+      
+      if (interview_id) {
+        return interview_id;
+      } else {
+        throw new Error("면접 종료 후 ID를 받지 못했습니다.");
+      }
     } catch (err) {
       console.error("❌ 인터뷰 종료 요청 실패:", err);
       toast({
@@ -363,6 +364,18 @@ const Interview = () => {
         description: "서버에 종료 요청을 전송하지 못했습니다.",
         variant: "destructive"
       });
+      return null;
+    }
+  };
+
+  const handleManualFinish = async () => {
+    toast({
+      title: "면접 종료",
+      description: "결과 분석 페이지로 이동합니다..." // 텍스트 변경
+    });
+    const finishedInterviewId = await handleInterviewFinish(false);
+    if (finishedInterviewId) {
+      navigate(`/processing/${finishedInterviewId}`); // 경로 변경
     }
   };
 
@@ -492,7 +505,7 @@ const Interview = () => {
                         다음 질문
                       </Button>
                     ) : (
-                      <Button onClick={() => handleInterviewFinish(false)} variant="outline" size="lg">
+                      <Button onClick={handleManualFinish} variant="outline" size="lg">
                         <SkipForward className="mr-2 h-5 w-5" />
                         인터뷰 종료
                       </Button>
@@ -512,14 +525,14 @@ const Interview = () => {
             </CardHeader>
             <CardContent>
               <Textarea
-                value={transcription}
-                onChange={(e) => setTranscription(e.target.value)}
-                placeholder="이곳에 답변을 입력하세요. STT가 비활성화되었습니다."
+                value={manualAnswer}
+                onChange={(e) => setManualAnswer(e.target.value)}
+                placeholder="음성 인식이 자동으로 답변을 채워줍니다. 직접 수정하거나 입력할 수도 있습니다."
                 className="min-h-32 text-base"
                 disabled={!isRecording}
               />
               <div className="flex justify-end gap-2 mt-4">
-                <Button variant="ghost" onClick={() => setTranscription('')}>초기화</Button>
+                <Button variant="ghost" onClick={() => { setManualAnswer(''); setTranscription(''); }}>초기화</Button>
                 <Button onClick={handleNextQuestion}>입력</Button>
               </div>
             </CardContent>

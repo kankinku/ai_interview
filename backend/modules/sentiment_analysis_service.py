@@ -10,7 +10,7 @@ import io
 app = Flask(__name__)
 
 emotion_scores = {
-    'happy': 5,
+    'happy': 5, 
     'surprise': 2,
     'neutral': 1,
     'sad': -3,
