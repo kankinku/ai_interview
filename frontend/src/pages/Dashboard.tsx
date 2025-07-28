@@ -74,8 +74,8 @@ const Dashboard = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">면접 대시보드</h1>
-        <p className="text-slate-600">AI 면접 진행 현황과 성과를 확인하세요</p>
+        <h1 className="text-3xl font-bold text-foreground mb-2">면접 대시보드</h1>
+        <p className="text-foreground">AI 면접 진행 현황과 성과를 확인하세요</p>
       </div>
 
       {/* Quick Stats */}
@@ -84,10 +84,10 @@ const Dashboard = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600">총 면접 횟수</p>
-                <p className="text-2xl font-bold text-slate-900">{stats.totalInterviews}</p>
+                <p className="text-sm text-foreground">총 면접 횟수</p>
+                <p className="text-2xl font-bold text-foreground">{stats.totalInterviews}</p>
               </div>
-              <Brain className="h-8 w-8 text-blue-600" />
+              <Brain className="h-8 w-8 text-primary" />
             </div>
           </CardContent>
         </Card>
@@ -96,10 +96,10 @@ const Dashboard = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600">평균 점수</p>
-                <p className="text-2xl font-bold text-slate-900">{stats.averageScore}</p>
+                <p className="text-sm text-foreground">평균 점수</p>
+                <p className="text-2xl font-bold text-foreground">{stats.averageScore}</p>
               </div>
-              <BarChart3 className="h-8 w-8 text-green-600" />
+              <BarChart3 className="h-8 w-8 text-primary" />
             </div>
           </CardContent>
         </Card>
@@ -108,10 +108,10 @@ const Dashboard = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600">목표 달성률</p>
-                <p className="text-2xl font-bold text-slate-900">{achievementRate}%</p>
+                <p className="text-sm text-foreground">목표 달성률</p>
+                <p className="text-2xl font-bold text-foreground">{achievementRate}%</p>
               </div>
-              <Target className="h-8 w-8 text-purple-600" />
+              <Target className="h-8 w-8 text-primary" />
             </div>
           </CardContent>
         </Card>
@@ -120,10 +120,10 @@ const Dashboard = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600">이번 주 학습시간</p>
-                <p className="text-2xl font-bold text-slate-900">{stats.weeklyStudyHours}h</p>
+                <p className="text-sm text-foreground">이번 주 학습시간</p>
+                <p className="text-2xl font-bold text-foreground">{stats.weeklyStudyHours}h</p>
               </div>
-              <Clock className="h-8 w-8 text-orange-600" />
+              <Clock className="h-8 w-8 text-primary" />
             </div>
           </CardContent>
         </Card>
@@ -135,17 +135,17 @@ const Dashboard = () => {
           {/* Start New Interview */}
           <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-blue-100">
             <CardHeader>
-              <CardTitle className="flex items-center text-blue-900">
+              <CardTitle className="flex items-center text-primary">
                 <Play className="mr-2 h-5 w-5" />
                 새로운 면접 시작
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-blue-700 mb-4">
+              <p className="text-primary mb-4">
                 AI와 함께 실전같은 면접을 경험하고 즉시 피드백을 받아보세요
               </p>
               <Link to="/interview">
-                <Button className="bg-blue-600 hover:bg-blue-700">
+                <Button className="bg-primary hover:bg-primary/90">
                   면접 시작하기
                   <Play className="ml-2 h-4 w-4" />
                 </Button>
@@ -170,12 +170,12 @@ const Dashboard = () => {
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-medium text-slate-900">
+                        <h3 className="font-medium text-foreground">
                           {interview.position}
                         </h3>
                         <Badge variant="secondary">{interview.status}</Badge>
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-slate-600">
+                      <div className="flex items-center gap-4 text-sm text-foreground">
                         <span>{interview.date}</span>
                         <span>
                           {interview.duration_minutes !== null
@@ -185,12 +185,12 @@ const Dashboard = () => {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-lg font-bold text-slate-900">
+                      <div className="text-lg font-bold text-foreground">
                         {interview.score}점
                       </div>
                       <Link 
                         to={`/results/${interview.interview_id}`}
-                        className="text-sm text-blue-600 hover:text-blue-700"
+                        className="text-sm text-primary hover:text-primary/90"
                       >
                         결과 보기
                       </Link>
@@ -215,11 +215,11 @@ const Dashboard = () => {
             <CardContent>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">현재 목표</span>
+                  <span className="text-sm text-foreground">현재 목표</span>
                   <span className="font-bold text-lg">{selectedGoal}점</span>
                 </div>
                 <Progress value={achievementRate} className="h-2" />
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-foreground">
                   목표까지 {Math.max(0, selectedGoal - stats.averageScore).toFixed(1)}점 남았습니다
                 </p>
                 <div className="flex gap-2">
@@ -251,7 +251,7 @@ const Dashboard = () => {
                 {skillAreas.map((skill, index) => (
                   <div key={index}>
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm text-slate-700">{skill.name}</span>
+                      <span className="text-sm text-foreground">{skill.name}</span>
                       <span className="text-sm font-medium">{skill.score}점</span>
                     </div>
                     <div className="w-full bg-slate-200 rounded-full h-2">
