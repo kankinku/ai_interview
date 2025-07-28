@@ -1,0 +1,26 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies required by opencv-python and other ML libraries
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    ffmpeg \
+    libfontconfig1 \
+    libice6 \
+    && apt-get clean
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# run_ai_servers.py 에서 사용하는 포트들
+EXPOSE 5001
+EXPOSE 8765
+
+CMD ["python", "run_ai_servers.py"] 

@@ -1,12 +1,11 @@
 // routes/evaluation.js
 const express = require("express");
 const router = express.Router();
-const { 
-    getEvaluationResult,
-    getEvaluationHistory 
-} = require("../controllers/evaluationController");
+const evaluationController = require("../controllers/evaluationController");
 
-router.get("/result/:interview_id", getEvaluationResult);
-router.get("/history/:userId", getEvaluationHistory);
+router.get("/history/:userId", evaluationController.getEvaluationHistory);
+router.get("/result/:interview_id", evaluationController.getEvaluationResult);
+router.get("/result/:interviewId/questions", evaluationController.getQuestionAnalysis);
+
 
 module.exports = router;

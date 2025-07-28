@@ -25,13 +25,21 @@ exports.login = async (req, res) => {
 
         const token = generateToken(user.user_id);
 
+        // 사용자의 질문 보유 여부 확인
+        const [questionRows] = await db.execute(
+            'SELECT COUNT(*) as questionCount FROM user_question WHERE user_id = ?',
+            [user.user_id]
+        );
+        const hasQuestions = questionRows[0].questionCount > 0;
+
         res.json({
             token,
             user: {
                 id: user.user_id,
                 name: user.user_name,
                 email
-            }
+            },
+            hasQuestions
         });
     } catch (err) {
         console.error("로그인 오류:", err);
@@ -55,13 +63,21 @@ exports.signup = async (req, res) => {
         if (existing.length > 0)
             return res.status(400).json({ error: "이미 존재하는 이메일입니다." });
 
-        const [userResult] = await db.execute(
+        // user_info 테이블에 사용자 정보 추가
+        const newUserInfo = {
+            user_name: name,
+            email: email,
+            learning_field: req.body.learning_field || '리액트', // 기본값 설정
+            preferred_language: req.body.preferred_language || '자바스크립트' // 기본값 설정
+        };
+
+        const [userInfoResult] = await db.execute(
             `INSERT INTO user_info (user_name, email, learning_field, preferred_language)
             VALUES (?, ?, ?, ?)`,
-            [name, email, learning_field ?? null, preferred_language ?? null]
+            [newUserInfo.user_name, newUserInfo.email, newUserInfo.learning_field, newUserInfo.preferred_language]
         );
 
-        const userId = userResult.insertId;
+        const userId = userInfoResult.insertId;
         const hashedPassword = await bcrypt.hash(password, 10);
 
         await db.execute(

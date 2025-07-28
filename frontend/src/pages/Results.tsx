@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, TrendingUp, Award, PlayCircle, FileText, Target, Brain, Clock, Eye, Volume2 } from "lucide-react";
+import { TrendingUp, Award, Brain, Clock, Eye, Volume2, Target, PlayCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface EvaluationResult {
@@ -17,47 +17,63 @@ interface EvaluationResult {
   total_score: number;
   final_feedback: string;
   reason_summary: string;
-  // TODO: Add fields for other data points if available from API
-  // e.g., date, position, duration, etc.
+  interview_date: string; // 추가
+  interview_duration: string; // 추가
+  position: string; // 추가
+  question_count: number; // 추가
+  strengths: string[]; // 추가
+  score_change: number | null; // 추가
 }
+
+interface QuestionAnalysis {
+  question: string;
+  answer: string;
+  score: number;
+  feedback: string;
+  strengths: string[];
+  improvements: string[];
+}
+
+const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 const Results = () => {
   const { interviewId } = useParams<{ interviewId: string }>();
   const [result, setResult] = useState<EvaluationResult | null>(null);
+  const [questionAnalyses, setQuestionAnalyses] = useState<QuestionAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // These are not yet in the DB, so we keep them as static for now
-  const [selectedQuestion, setSelectedQuestion] = useState(0);
-  const questionAnalysis = [
-    {
-      question: "자기소개를 해주세요. 본인의 강점과 경험을 중심으로 설명해주시면 됩니다.",
-      score: 85,
-      duration: "2분 45초",
-      feedback: "명확하고 체계적인 답변이었습니다. 구체적인 경험 사례를 더 포함하면 좋겠습니다.",
-      strengths: ["논리적 구성", "자신감 있는 발표"],
-      improvements: ["구체적 사례 추가", "시간 관리"]
-    },
-  ];
+  const [selectedQuestion, setSelectedQuestion] = useState(0); // 상태 다시 추가
 
   useEffect(() => {
-    const fetchResult = async () => {
+    if (!interviewId) {
+      setError("잘못된 접근입니다. 면접 ID가 없습니다.");
+      setLoading(false);
+      return;
+    }
+
+    const fetchData = async () => {
       try {
-        setLoading(true);
-        const response = await axios.get(`/api/evaluation/result/${interviewId}`);
-        setResult(response.data.data);
-        setError(null);
+        const [resultResponse, qnaResponse] = await Promise.all([
+          axios.get(`/api/evaluation/result/${interviewId}`),
+          axios.get(`/api/evaluation/result/${interviewId}/questions`),
+        ]);
+
+        setResult(resultResponse.data.data);
+        const parsedQnaData = qnaResponse.data.data.map((item: any) => ({
+            ...item,
+            strengths: typeof item.strengths === 'string' ? JSON.parse(item.strengths) : item.strengths,
+            improvements: typeof item.improvements === 'string' ? JSON.parse(item.improvements) : item.improvements,
+        }));
+        setQuestionAnalyses(parsedQnaData);
+        setLoading(false);
       } catch (err) {
-        setError("결과를 불러오는 데 실패했습니다. 다시 시도해주세요.");
-        console.error(err);
-      } finally {
+        console.error("결과 로딩 실패:", err);
+        setError("결과를 불러오는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
         setLoading(false);
       }
     };
 
-    if (interviewId) {
-      fetchResult();
-    }
+    fetchData();
   }, [interviewId]);
 
   const getGrade = (score: number) => {
@@ -74,8 +90,7 @@ const Results = () => {
     return (
       <div className="flex flex-col items-center justify-center h-screen text-center">
         <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-600 mb-4"></div>
-        <h2 className="text-2xl font-bold mb-2">평가 진행 중...</h2>
-        <p className="text-slate-600">AI가 답변을 분석하고 있습니다. 잠시만 기다려주세요.</p>
+        <h2 className="text-2xl font-bold mb-2">결과를 불러오는 중...</h2>
       </div>
     );
   }
@@ -106,8 +121,7 @@ const Results = () => {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">면접 결과 분석</h1>
-            {/* TODO: Add position and date from API when available */}
-            <p className="text-slate-600">프론트엔드 개발자 • 2024-07-26</p>
+            <p className="text-slate-600">{result.position || "미지정 포지션"} • {new Date(result.interview_date || Date.now()).toLocaleDateString()}</p>
           </div>
           <div className="text-right">
             <div className="text-4xl font-bold text-blue-600 mb-1">
@@ -130,25 +144,30 @@ const Results = () => {
           </CardContent>
         </Card>
         
-        {/* TODO: Replace with dynamic data when available */}
         <Card>
           <CardContent className="p-6 text-center">
             <Clock className="h-8 w-8 text-blue-500 mx-auto mb-2" />
-            <div className="text-2xl font-bold text-slate-900">28분 30초</div>
+            <div className="text-2xl font-bold text-slate-900">{result.interview_duration || "N/A"}</div>
             <div className="text-sm text-slate-600">면접 시간</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-6 text-center">
             <Brain className="h-8 w-8 text-purple-500 mx-auto mb-2" />
-            <div className="text-2xl font-bold text-slate-900">3개</div>
+            <div className="text-2xl font-bold text-slate-900">{result.question_count || questionAnalyses.length}개</div>
             <div className="text-sm text-slate-600">답변 질문</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-6 text-center">
             <TrendingUp className="h-8 w-8 text-green-500 mx-auto mb-2" />
-            <div className="text-2xl font-bold text-slate-900">+5점</div>
+            <div className={`text-2xl font-bold text-slate-900 ${
+              result.score_change === null ? '' : result.score_change > 0 ? 'text-green-600' : 'text-red-600'
+            }`}>
+              {result.score_change !== null 
+                ? `${result.score_change > 0 ? '+' : ''}${result.score_change.toFixed(0)}점` 
+                : 'N/A'}
+            </div>
             <div className="text-sm text-slate-600">이전 대비</div>
           </CardContent>
         </Card>
@@ -198,11 +217,19 @@ const Results = () => {
                       주요 강점
                     </h3>
                     <ul className="space-y-2">
-                     {/* TODO: Parse from final_feedback or a dedicated field */}
-                      <li className="flex items-start">
-                        <div className="w-2 h-2 bg-green-500 rounded-full mt-2 mr-3" />
-                        <span className="text-sm text-slate-700">뛰어난 기술 역량과 체계적인 문제 접근</span>
-                      </li>
+                     {result.strengths && result.strengths.length > 0 ? (
+                        result.strengths.map((strength, i) => (
+                          <li key={i} className="flex items-start">
+                            <div className="w-2 h-2 bg-green-500 rounded-full mt-2 mr-3 flex-shrink-0" />
+                            <span className="text-sm text-slate-700">{strength}</span>
+                          </li>
+                        ))
+                      ) : (
+                        <li className="flex items-start">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full mt-2 mr-3" />
+                          <span className="text-sm text-slate-500">강점 데이터가 없습니다.</span>
+                        </li>
+                      )}
                     </ul>
                   </div>
 
@@ -214,7 +241,7 @@ const Results = () => {
                     <ul className="space-y-2">
                       {result.reason_summary.split(',').map((reason, i) => (
                         <li key={i} className="flex items-start">
-                          <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 mr-3" />
+                          <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 mr-3 flex-shrink-0" />
                           <span className="text-sm text-slate-700">{reason.trim()}</span>
                         </li>
                       ))}
@@ -250,10 +277,103 @@ const Results = () => {
 
         {/* Other tabs are omitted for brevity but would be handled similarly */}
         <TabsContent value="questions">
-            질문별 상세 분석은 현재 DB에 관련 데이터가 없어 구현되지 않았습니다.
+          {questionAnalyses.length > 0 ? (
+            <div className="grid lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-1">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>질문 목록</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {questionAnalyses.map((q, index) => (
+                      <Button
+                        key={index}
+                        variant={selectedQuestion === index ? "secondary" : "ghost"}
+                        className="w-full justify-start text-left h-auto"
+                        onClick={() => setSelectedQuestion(index)}
+                      >
+                        <span className="truncate">질문 {index + 1}: {q.question}</span>
+                      </Button>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+              <div className="lg:col-span-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>질문 {selectedQuestion + 1} 상세 분석</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div>
+                      <h4 className="font-semibold text-slate-800 mb-2">Q: {questionAnalyses[selectedQuestion].question}</h4>
+                      <p className="text-slate-600 bg-slate-50 p-3 rounded-md">
+                        A: {questionAnalyses[selectedQuestion].answer}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-slate-600">답변 점수</div>
+                      <Badge variant="default" className="text-base">{questionAnalyses[selectedQuestion].score}점</Badge>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold text-slate-800 mb-2">AI 피드백</h4>
+                      <p className="text-slate-600 leading-relaxed">{questionAnalyses[selectedQuestion].feedback}</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <h4 className="font-semibold text-green-700 mb-2">잘한 점</h4>
+                        <ul className="space-y-1">
+                          {questionAnalyses[selectedQuestion].strengths.map((s, i) => (
+                            <li key={i} className="text-sm text-slate-600">✓ {s}</li>
+                          ))}
+                        </ul>
+                      </div>
+                       <div>
+                        <h4 className="font-semibold text-orange-700 mb-2">개선할 점</h4>
+                        <ul className="space-y-1">
+                          {questionAnalyses[selectedQuestion].improvements.map((imp, i) => (
+                            <li key={i} className="text-sm text-slate-600">💡 {imp}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          ) : (
+            <Card>
+              <CardHeader><CardTitle>질문별 상세 분석</CardTitle></CardHeader>
+              <CardContent><p>질문별 분석 데이터가 없습니다.</p></CardContent>
+            </Card>
+          )}
         </TabsContent>
         <TabsContent value="behavior">
-            비언어적/음성 분석은 현재 DB에 관련 데이터가 없어 구현되지 않았습니다.
+            <Card>
+              <CardHeader><CardTitle>비언어적/음성 분석</CardTitle></CardHeader>
+              <CardContent>
+                <p className="text-slate-600">비언어적/음성 분석은 현재 텍스트 기반 평가로 대체되었습니다. 아래는 AI가 분석한 주요 항목입니다.</p>
+                <div className="mt-4 grid md:grid-cols-2 gap-4">
+                  <div className="flex items-center gap-4 rounded-lg border p-4">
+                     <Volume2 className="h-6 w-6 text-blue-500"/>
+                     <div>
+                       <div className="font-semibold">기술 전문성 (Technical)</div>
+                       <div className="text-2xl font-bold">{Math.round(result.voice_score)}점</div>
+                     </div>
+                  </div>
+                  <div className="flex items-center gap-4 rounded-lg border p-4">
+                    <Eye className="h-6 w-6 text-green-500"/>
+                     <div>
+                       <div className="font-semibold">면접 태도 (Attitude)</div>
+                       <div className="text-2xl font-bold">{Math.round(result.visual_score)}점</div>
+                     </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
         </TabsContent>
 
       </Tabs>

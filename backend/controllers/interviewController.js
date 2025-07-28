@@ -19,7 +19,7 @@ const {
     generateInterviewQuestions,
 } = require("../modules/interview-helper");
 
-const { conductFinalEvaluation } = require("../modules/interviewEvaluation");
+const { evaluateInterview } = require('../modules/interviewEvaluation');
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -303,21 +303,25 @@ exports.receiveInterviewFinish = async (req, res) => {
         
         await connection.commit();
         
-        // 면접이 정상적으로 종료되었으므로, 백그라운드에서 최종 평가를 수행합니다.
         // 클라이언트에게는 즉시 응답을 보냅니다.
         res.status(200).json({ message: "면접이 성공적으로 종료되었습니다. 곧 평가 결과가 생성됩니다.", interview_id });
 
-        // 평가 함수를 비동기적으로 호출 (await 없이)
-        conductFinalEvaluation(interview_id).catch(err => {
+        // 평가 함수를 비동기적으로 호출 (io, userSockets 전달)
+        const io = req.app.get('io');
+        const userSockets = req.app.get('userSockets');
+        evaluateInterview(interview_id, io, userSockets).catch(err => {
             console.error(`❌ interview_id: ${interview_id} 최종 평가 중 오류 발생:`, err);
         });
 
     } catch (err) {
-        await connection.rollback();
+        if (connection) await connection.rollback();
         console.error("❌ 면접 종료 처리 실패:", err);
-        res.status(500).json({ error: "서버 오류" });
+        // 이미 응답을 보냈을 수 있으므로, 응답 헤더가 전송되지 않았을 때만 에러 응답을 보냅니다.
+        if (!res.headersSent) {
+            res.status(500).json({ error: "서버 오류" });
+        }
     } finally {
-        connection.release();
+        if (connection) connection.release();
     }
 };
 
@@ -329,12 +333,11 @@ exports.getRecentInterviews = async (req, res) => {
     }
 
     try {
-        const [rows] = await db.query(
+        const [sessions] = await db.query(
             `SELECT 
                 interview_id,
                 user_id,
                 learning_field as position,
-                sentiment_score as score,
                 CASE 
                     WHEN end_time IS NOT NULL THEN 'completed'
                     ELSE 'in_progress'
@@ -347,7 +350,35 @@ exports.getRecentInterviews = async (req, res) => {
              LIMIT 5`,
             [userId]
         );
-        res.status(200).json(rows);
+
+        if (sessions.length === 0) {
+            return res.status(200).json([]);
+        }
+
+        const interviewIds = sessions.map(s => s.interview_id);
+        let evaluations = {};
+        try {
+            const [scores] = await db.query(
+                `SELECT interview_id, total_score FROM evaluations WHERE interview_id IN (?)`,
+                [interviewIds]
+            );
+            scores.forEach(s => {
+                evaluations[s.interview_id] = s.total_score;
+            });
+        } catch (err) {
+            if (err.code !== 'ER_NO_SUCH_TABLE') {
+                throw err; // 다른 종류의 에러는 그대로 전파
+            }
+            // evaluations 테이블이 없는 경우, 점수 없이 진행
+            console.warn("`evaluations` table not found, proceeding without scores.");
+        }
+
+        const results = sessions.map(s => ({
+            ...s,
+            score: evaluations[s.interview_id] || null
+        }));
+
+        res.status(200).json(results);
     } catch (err) {
         console.error("❌ 최근 면접 기록 조회 실패:", err);
         res.status(500).json({ error: "서버 오류" });
