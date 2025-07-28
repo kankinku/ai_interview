@@ -3,12 +3,14 @@ import { Link, useLocation, useNavigate } from "react-router-dom"; // ✅ naviga
 import { Button } from "@/components/ui/button";
 import { Brain, Menu, X, User, Settings, BarChart3, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate(); // ✅ navigate 사용
   const { user, logout } = useAuth();
+  const { actualTheme } = useTheme();
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -26,13 +28,13 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="bg-white/95 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-50">
+    <nav className={`bg-navbar-background backdrop-blur-sm border-b border-navbar-border sticky top-0 z-50`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <Link to="/" className="flex items-center space-x-2">
-              <Brain className="h-8 w-8 text-blue-600" />
-              <span className="text-xl font-bold text-slate-900">AI Interview</span>
+              <Brain className="h-8 w-8 text-primary" />
+              <span className="text-xl font-bold text-foreground">AI Interview</span>
             </Link>
           </div>
 
@@ -45,8 +47,8 @@ const Navbar = () => {
                   to={item.path}
                   className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     isActive(item.path)
-                      ? "bg-blue-100 text-blue-700"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                      ? "bg-blue-100 text-primary"
+                      : "text-foreground hover:text-foreground hover:bg-slate-100"
                   }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -57,7 +59,7 @@ const Navbar = () => {
 
             {user ? (
               <div className="flex items-center space-x-2">
-                <span className="text-sm text-slate-600">안녕하세요, {user.name}      </span>
+                <span className="text-sm text-foreground">안녕하세요, {user.name}      </span>
                 <Button size="sm" variant="outline" onClick={handleLogout}>
                   <LogOut className="h-4 w-4 mr-1" />
                   로그아웃
@@ -65,7 +67,7 @@ const Navbar = () => {
               </div>
             ) : (
               <Link to="/login">
-                <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+                <Button size="sm" className="bg-primary hover:bg-primary/90">
                   로그인
                 </Button>
               </Link>
@@ -90,8 +92,8 @@ const Navbar = () => {
                     to={item.path}
                     className={`flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium ${
                       isActive(item.path)
-                        ? "bg-blue-100 text-blue-700"
-                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                        ? "bg-blue-100 text-primary"
+                        : "text-foreground hover:text-foreground hover:bg-slate-100"
                     }`}
                     onClick={() => setIsOpen(false)}
                   >
@@ -103,7 +105,7 @@ const Navbar = () => {
 
               {user ? (
                 <div className="px-3 py-2 space-y-2">
-                  <p className="text-sm text-slate-600">안녕하세요, {user.name}      </p>
+                  <p className="text-sm text-foreground">안녕하세요, {user.name}      </p>
                   <Button size="sm" variant="outline" onClick={handleLogout} className="w-full">
                     <LogOut className="h-4 w-4 mr-1" />
                     로그아웃
@@ -111,7 +113,7 @@ const Navbar = () => {
                 </div>
               ) : (
                 <Link to="/login" onClick={() => setIsOpen(false)}>
-                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 w-full mx-3">
+                  <Button size="sm" className="bg-primary hover:bg-primary/90 w-full mx-3">
                     로그인
                   </Button>
                 </Link>

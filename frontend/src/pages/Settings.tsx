@@ -29,12 +29,14 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import axios from "axios";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { toast as sonnerToast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const Settings = () => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [profile, setProfile] = useState({
     name: "",
     email: "",
@@ -45,6 +47,7 @@ const Settings = () => {
   });
 
   const [companies, setCompanies] = useState<{ company_id: number; company_name: string; talent_url: string | null }[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -76,9 +79,30 @@ const Settings = () => {
         });
       }
     };
+
+    const fetchQuestions = async () => {
+      if (user && profile.targetCompany) {
+        const selectedCompany = companies.find(c => c.company_name === profile.targetCompany);
+        if (selectedCompany) {
+          try {
+            const response = await axios.get(`/api/interview/questions/${user.id}/${selectedCompany.company_id}`);
+            console.log("Fetched questions:", response.data.questions);
+          } catch (error) {
+            console.error("질문 로딩 실패:", error);
+            toast({
+              title: "질문 로딩 실패",
+              description: "면접 질문을 가져오는 데 문제가 발생했습니다.",
+              variant: "destructive",
+            });
+          }
+        }
+      }
+    };
+
     fetchUserProfile();
     fetchCompanies();
-  }, [toast, user]);
+    fetchQuestions();
+  }, [toast, user, profile.targetCompany, companies, selectedCompanyId]);
 
   const handleTargetCompanyChange = (value: string) => {
     const selectedCompany = companies.find(c => c.company_name === value);
@@ -91,6 +115,7 @@ const Settings = () => {
         desiredCompany: selectedCompany.company_name,
         talentRequirementsUrl: selectedCompany.talent_url || "",
       });
+      setSelectedCompanyId(selectedCompany.company_id);
     }
   };
 
@@ -105,7 +130,6 @@ const Settings = () => {
   const [preferences, setPreferences] = useState({
     emailNotifications: true,
     pushNotifications: false,
-    darkMode: false,
     language: "ko"
   });
 
@@ -177,9 +201,12 @@ const Settings = () => {
     const formData = new FormData();
     formData.append("url", companyInfo.talentRequirementsUrl);
     formData.append("resume", companyInfo.coverLetterFile);
-    formData.append("company_name", companyInfo.desiredCompany); // 추가
+    formData.append("company_name", companyInfo.desiredCompany);
     if(user) {
       formData.append("user_id", user.id.toString());
+    }
+    if (selectedCompanyId) {
+      formData.append("company_id", selectedCompanyId.toString());
     }
 
     setIsGenerating(true);
@@ -281,13 +308,13 @@ const Settings = () => {
       {isGenerating && (
         <div className="absolute inset-0 bg-white bg-opacity-80 flex flex-col items-center justify-center z-50 rounded-lg">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900 mb-4"></div>
-          <p className="text-lg font-semibold text-slate-900">면접 질문 생성중...</p>
+          <p className="text-lg font-semibold text-foreground">면접 질문 생성중...</p>
         </div>
       )}
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">설정</h1>
-        <p className="text-slate-600">프로필과 면접 환경을 관리하세요</p>
+        <h1 className="text-3xl font-bold text-foreground mb-2">설정</h1>
+        <p className="text-foreground">프로필과 면접 환경을 관리하세요</p>
       </div>
 
       <Tabs defaultValue="profile" className="space-y-6">
@@ -444,7 +471,7 @@ const Settings = () => {
                   value={companyInfo.talentRequirementsUrl}
                   onChange={(e) => setCompanyInfo({...companyInfo, talentRequirementsUrl: e.target.value})}
                 />
-                <p className="text-sm text-slate-600 mt-1">
+                <p className="text-sm text-foreground mt-1">
                   예: https://www.samsung.com/sec/aboutsamsung/careers/core-values/
                 </p>
               </div>
@@ -457,10 +484,10 @@ const Settings = () => {
                       <div className="flex items-center space-x-2">
                         <FileText className="h-5 w-5 text-slate-600" />
                         <div>
-                          <p className="text-sm font-medium text-slate-900">
+                          <p className="text-sm font-medium text-foreground">
                             {companyInfo.coverLetterFile.name}
                           </p>
-                          <p className="text-xs text-slate-600">
+                          <p className="text-xs text-foreground">
                             {(companyInfo.coverLetterFile.size / 1024 / 1024).toFixed(2)} MB
                           </p>
                         </div>
@@ -482,10 +509,10 @@ const Settings = () => {
                       >
                         <div className="flex flex-col items-center justify-center pt-5 pb-6">
                           <Upload className="w-8 h-8 mb-2 text-slate-600" />
-                          <p className="mb-2 text-sm text-slate-600">
+                          <p className="mb-2 text-sm text-foreground">
                             <span className="font-semibold">클릭하여 업로드</span> 또는 드래그 앤 드롭
                           </p>
-                          <p className="text-xs text-slate-500">PDF 파일 (최대 10MB)</p>
+                          <p className="text-xs text-foreground">PDF 파일 (최대 10MB)</p>
                         </div>
                         <input
                           id="file-upload"
@@ -624,14 +651,19 @@ const Settings = () => {
                 />
               </div>
 
-              <div className="flex items-center justify-between">
-                <Label htmlFor="dark-mode">다크 모드</Label>
-                <Switch
-                  id="dark-mode"
-                  checked={preferences.darkMode}
-                  onCheckedChange={(checked) => setPreferences({...preferences, darkMode: checked})}
-                />
-              </div>
+              <div>
+                <Label htmlFor="theme">테마</Label>
+                <Select value={theme} onValueChange={(value) => setTheme(value as 'light' | 'dark' | 'system' | 'pink')}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="light">라이트 모드</SelectItem>
+                    <SelectItem value="dark">다크 모드</SelectItem>
+                    <SelectItem value="pastel">핑크 모드</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div> 
 
               <div>
                 <Label htmlFor="language">언어</Label>
@@ -669,7 +701,7 @@ const Settings = () => {
               </div>
               <Separator />
               <div className="flex items-center justify-between">
-                <Label htmlFor="account-delete" className="text-red-600">계정 삭제</Label>
+                <Label htmlFor="account-delete" className="text-destructive">계정 삭제</Label>
                 <Button onClick={handleAccountDelete} variant="destructive" size="sm">
                   <Trash2 className="mr-2 h-4 w-4" />
                   삭제

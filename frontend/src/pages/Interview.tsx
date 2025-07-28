@@ -390,8 +390,8 @@ const Interview = () => {
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">AI 면접 진행</h1>
-            <p className="text-slate-600">실제 면접처럼 진행됩니다. 침착하게 답변해주세요.</p>
+            <h1 className="text-2xl font-bold text-foreground">AI 면접 진행</h1>
+            <p className="text-foreground">실제 면접처럼 진행됩니다. 침착하게 답변해주세요.</p>
           </div>
           <div className="flex items-center gap-4">
             {isInterviewStarted && (
@@ -412,24 +412,24 @@ const Interview = () => {
 
       {/* Current Question */}
       <div className="mb-8">
-        <Card className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+        <Card className="border-2 border-foreground/10 bg-gradient-to-r from-foreground-50 to-indigo-50">
           <CardHeader className="pb-4">
-            <CardTitle className="flex items-center text-blue-700">
+            <CardTitle className="flex items-center text-foreground">
               <HelpCircle className="mr-3 h-6 w-6" />
               {isInterviewStarted ? `질문 ${currentQuestion + 1}` : "면접 준비"}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-center">
-              <p className="text-xl md:text-2xl font-semibold leading-relaxed text-slate-800 mb-6">
+              <p className="text-xl md:text-2xl font-semibold leading-relaxed text-foreground mb-6">
                 {isInterviewStarted
                   ? questions.length > 0
                     ? questions[currentQuestion]
                     : "면접 질문이 없습니다. 설정 페이지에서 질문을 생성해주세요."
                   : "면접 시작 버튼을 누르면 이곳에서 질문이 나옵니다."}
               </p>
-              <div className="p-4 bg-blue-100 rounded-lg border border-blue-200">
-                <p className="text-base text-blue-800">
+              <div className="p-4 bg-foreground/10 rounded-lg border border-foreground/10">
+                <p className="text-base text-foreground/80">
                   💡 <strong>답변 팁:</strong> 구체적인 경험과 결과를 포함하여 답변하면 더 좋은 평가를 받을 수 있습니다.
                 </p>
               </div>
@@ -465,7 +465,7 @@ const Interview = () => {
                   autoPlay 
                   muted 
                   className="w-full h-64 md:h-80 object-cover" 
-                  style={{ display: isVideoOn ? 'block' : 'none' }}
+                  style={{ display: isVideoOn ? 'block' : 'none', transform: 'scaleX(-1)' }}
                   onLoadedData={() => setIsReadyToAnalyze(true)}
                 />
                 {!isVideoOn && (
@@ -489,7 +489,7 @@ const Interview = () => {
 
               <div className="flex justify-center gap-4 mt-6">
                 {!isInterviewStarted ? (
-                  <Button onClick={startInterview} size="lg" className="bg-blue-600 hover:bg-blue-700">
+                  <Button onClick={startInterview} size="lg" className="bg-foreground hover:bg-foreground/70">
                     <Play className="mr-2 h-5 w-5" />
                     면접 시작
                   </Button>
