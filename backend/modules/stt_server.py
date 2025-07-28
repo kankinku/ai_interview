@@ -10,7 +10,9 @@ vad_model, utils = torch.hub.load('snakers4/silero-vad', model='silero_vad', for
 (get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks) = utils
 vad_iterator = VADIterator(vad_model, threshold=0.5, sampling_rate=16000)
 
-vosk_model = Model("model-ko")
+# vosk_model = Model("model-ko")
+vosk_model = Model("/Users/macbookair/Downloads/ai_interview-main 4/ai_interview-1/backend/modules/model-ko")
+
 recognizer = KaldiRecognizer(vosk_model, 16000)
 
 # STT 세션 상태 관리 클래스

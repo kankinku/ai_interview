@@ -119,8 +119,8 @@ const ImprovementPlan = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">개선 로드맵</h1>
-        <p className="text-slate-600">체계적인 학습 계획으로 면접 역량을 단계별로 향상시키세요</p>
+        <h1 className="text-3xl font-bold text-foreground mb-2">개선 로드맵</h1>
+        <p className="text-foreground">체계적인 학습 계획으로 면접 역량을 단계별로 향상시키세요</p>
       </div>
 
       {/* Progress Overview */}
@@ -143,11 +143,11 @@ const ImprovementPlan = () => {
               ].map((skill, index) => (
                 <div key={index} className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="font-medium text-slate-900">{skill.name}</span>
+                    <span className="font-medium text-foreground">{skill.name}</span>
                     <div className="flex items-center gap-2 text-sm">
-                      <span className="text-slate-600">{skill.current}점</span>
+                      <span className="text-foreground">{skill.current}점</span>
                       <span className="text-slate-400">→</span>
-                      <span className="font-bold text-blue-600">{skill.target}점</span>
+                      <span className="font-bold text-primary">{skill.target}점</span>
                     </div>
                   </div>
                   <div className="relative">
@@ -177,8 +177,8 @@ const ImprovementPlan = () => {
           <CardContent>
             <div className="space-y-4">
               <div className="text-center">
-                <div className="text-3xl font-bold text-blue-600 mb-1">25%</div>
-                <div className="text-sm text-slate-600">전체 로드맵 진행률</div>
+                <div className="text-3xl font-bold text-primary mb-1">25%</div>
+                <div className="text-sm text-foreground">전체 로드맵 진행률</div>
                 <Progress value={25} className="mt-2" />
               </div>
 
@@ -191,14 +191,14 @@ const ImprovementPlan = () => {
                       {milestone.achieved ? (
                         <CheckCircle className="h-4 w-4 text-green-600" />
                       ) : (
-                        <span className="text-xs font-medium text-slate-500">{milestone.week}</span>
+                        <span className="text-xs font-medium text-foreground">{milestone.week}</span>
                       )}
                     </div>
                     <div className="flex-1">
-                      <div className="text-sm font-medium text-slate-900">
+                      <div className="text-sm font-medium text-foreground">
                         {milestone.week}주차 목표
                       </div>
-                      <div className="text-xs text-slate-600">
+                      <div className="text-xs text-foreground">
                         {milestone.target}
                       </div>
                     </div>
@@ -242,7 +242,7 @@ const ImprovementPlan = () => {
                 <CardTitle>
                   {selectedWeek}주차: {learningPath[selectedWeek - 1].theme}
                 </CardTitle>
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-foreground">
                   {learningPath[selectedWeek - 1].focus}
                 </p>
               </CardHeader>
@@ -261,12 +261,12 @@ const ImprovementPlan = () => {
                       </div>
                       
                       <div className="flex-1">
-                        <h3 className="font-medium text-slate-900">{task.title}</h3>
+                        <h3 className="font-medium text-foreground">{task.title}</h3>
                         <div className="flex items-center gap-2 mt-1">
                           <Badge variant="outline" className="text-xs">
                             {task.type}
                           </Badge>
-                          <span className="text-xs text-slate-500 flex items-center">
+                          <span className="text-xs text-foreground flex items-center">
                             <Clock className="h-3 w-3 mr-1" />
                             {task.duration}
                           </span>
@@ -295,25 +295,25 @@ const ImprovementPlan = () => {
               <CardContent>
                 <div className="space-y-4">
                   <div className="p-4 bg-blue-50 rounded-lg">
-                    <h3 className="font-medium text-blue-900 mb-2">이번 주 핵심 목표</h3>
-                    <p className="text-sm text-blue-700">
+                    <h3 className="font-medium text-primary mb-2">이번 주 핵심 목표</h3>
+                    <p className="text-sm text-primary">
                       {learningPath[selectedWeek - 1].focus}
                     </p>
                   </div>
 
                   <div>
-                    <h3 className="font-medium text-slate-900 mb-3">예상 학습 시간</h3>
+                    <h3 className="font-medium text-foreground mb-3">예상 학습 시간</h3>
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">이론 학습</span>
+                        <span className="text-foreground">이론 학습</span>
                         <span className="font-medium">1.5시간</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">실습</span>
+                        <span className="text-foreground">실습</span>
                         <span className="font-medium">2.5시간</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">실전 연습</span>
+                        <span className="text-foreground">실전 연습</span>
                         <span className="font-medium">1시간</span>
                       </div>
                       <hr />
@@ -349,11 +349,11 @@ const ImprovementPlan = () => {
                   <div className="space-y-4">
                     {category.items.map((item, itemIndex) => (
                       <div key={itemIndex} className="border rounded-lg p-3 hover:bg-slate-50 transition-colors">
-                        <h3 className="font-medium text-slate-900 text-sm mb-1">
+                        <h3 className="font-medium text-foreground text-sm mb-1">
                           {item.title}
                         </h3>
                         <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2 text-xs text-slate-600">
+                          <div className="flex items-center gap-2 text-xs text-foreground">
                             {item.duration && (
                               <span className="flex items-center">
                                 <Clock className="h-3 w-3 mr-1" />
@@ -403,14 +403,14 @@ const ImprovementPlan = () => {
                     <div className="absolute -left-2 top-0 w-4 h-4 bg-blue-500 rounded-full" />
                     <div className="pb-6">
                       <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-lg font-semibold text-slate-900">
+                        <h3 className="text-lg font-semibold text-foreground">
                           {week.week}주차: {week.theme}
                         </h3>
                         <Badge variant={week.week === 1 ? "default" : "secondary"}>
                           {week.week === 1 ? "진행 중" : "예정"}
                         </Badge>
                       </div>
-                      <p className="text-slate-600 mb-4">{week.focus}</p>
+                      <p className="text-foreground mb-4">{week.focus}</p>
                       
                       <div className="grid md:grid-cols-3 gap-4">
                         {week.tasks.map((task, taskIndex) => (
@@ -419,9 +419,9 @@ const ImprovementPlan = () => {
                               <div className={`w-3 h-3 rounded-full ${
                                 task.completed ? 'bg-green-500' : 'bg-slate-400'
                               }`} />
-                              <span className="text-sm font-medium">{task.title}</span>
+                              <span className="text-sm font-medium text-foreground">{task.title}</span>
                             </div>
-                            <div className="text-xs text-slate-600 flex items-center">
+                            <div className="text-xs text-foreground flex items-center">
                               <Clock className="h-3 w-3 mr-1" />
                               {task.duration}
                             </div>

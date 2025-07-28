@@ -47,20 +47,46 @@ exports.generateQuestions = async (req, res) => {
         await connection.beginTransaction();
         
         // 회사 정보 저장 또는 업데이트
-        await connection.query(
+        const [companyResult] = await connection.query(
             `INSERT INTO company (company_name, talent_url) VALUES (?, ?)
              ON DUPLICATE KEY UPDATE talent_url = VALUES(talent_url)`,
             [company_name, url]
         );
 
+        let company_id;
+        if (companyResult.insertId) {
+            // New row was inserted
+            company_id = companyResult.insertId;
+        } else {
+            // Existing row was updated, fetch the company_id
+            const [existingCompanyRows] = await connection.query(
+                `SELECT company_id FROM company WHERE company_name = ?`,
+                [company_name]
+            );
+            if (existingCompanyRows.length > 0) {
+                company_id = existingCompanyRows[0].company_id;
+            } else {
+                // This case should ideally not happen if the previous query worked
+                return res.status(500).json({ error: "회사 ID를 찾을 수 없습니다." });
+            }
+        }
+
+        console.log("Attempting to extract keywords from URL:", url);
         const keywords = await extractKeywordsFromUrl(url);
+        console.log("Keywords extracted:", keywords);
+
+        console.log("Attempting to extract text from PDF:", resume.path);
         const resumeText = await extractTextFromPdf(resume.path);
+        console.log("Resume text extracted (first 200 chars):\n", resumeText.substring(0, 200));
+
+        console.log("Attempting to generate interview questions...");
         const questions = await generateInterviewQuestions(resumeText, keywords);
+        console.log("Questions generated:", questions.length, "questions");
 
         const insertPromises = questions.map((question) => {
             return connection.query(
-                "INSERT INTO user_question (user_id, question_text, is_custom) VALUES (?, ?, ?)",
-                [user_id, question, true]
+                "INSERT INTO user_question (user_id, company_id, question_text, is_custom) VALUES (?, ?, ?, ?)",
+                [user_id, company_id, question, true]
             );
         });
 
@@ -79,16 +105,16 @@ exports.generateQuestions = async (req, res) => {
 };
 
 exports.getQuestions = async (req, res) => {
-    const { user_id } = req.params;
+    const { user_id, company_id } = req.params; // company_id 추가
 
-    if (!user_id) {
-        return res.status(400).json({ error: "user_id가 필요합니다." });
+    if (!user_id || !company_id) {
+        return res.status(400).json({ error: "user_id와 company_id가 모두 필요합니다." });
     }
 
     try {
         const [rows] = await db.query(
-            "SELECT question_text FROM user_question WHERE user_id = ? ORDER BY RAND() LIMIT 10",
-            [user_id]
+            "SELECT question_text FROM user_question WHERE user_id = ? AND company_id = ? ORDER BY RAND() LIMIT 10",
+            [user_id, company_id] // company_id 추가
         );
 
         if (rows.length === 0) {
