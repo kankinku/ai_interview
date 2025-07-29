@@ -35,7 +35,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const Settings = () => {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth(); // updateUser 가져오기
   const { theme, setTheme } = useTheme();
   const [profile, setProfile] = useState({
     name: "",
@@ -65,7 +65,10 @@ const Settings = () => {
         }
       }
     };
+    fetchUserProfile();
+  }, [user, toast]);
 
+  useEffect(() => {
     const fetchCompanies = async () => {
       try {
         const response = await axios.get("/api/companies");
@@ -79,7 +82,10 @@ const Settings = () => {
         });
       }
     };
+    fetchCompanies();
+  }, [toast]);
 
+  useEffect(() => {
     const fetchQuestions = async () => {
       if (user && profile.targetCompany) {
         const selectedCompany = companies.find(c => c.company_name === profile.targetCompany);
@@ -89,20 +95,12 @@ const Settings = () => {
             console.log("Fetched questions:", response.data.questions);
           } catch (error) {
             console.error("질문 로딩 실패:", error);
-            toast({
-              title: "질문 로딩 실패",
-              description: "면접 질문을 가져오는 데 문제가 발생했습니다.",
-              variant: "destructive",
-            });
           }
         }
       }
     };
-
-    fetchUserProfile();
-    fetchCompanies();
     fetchQuestions();
-  }, [toast, user, profile.targetCompany, companies, selectedCompanyId]);
+  }, [user, profile.targetCompany, companies]);
 
   const handleTargetCompanyChange = (value: string) => {
     const selectedCompany = companies.find(c => c.company_name === value);
@@ -154,9 +152,11 @@ const Settings = () => {
       const response = await axios.put("/api/auth/profile", {
         userId: user.id,
         ...profile,
+        targetCompanyId: selectedCompanyId
       });
 
-      if (response.status === 200) {
+      if (response.status === 200 && response.data.user) {
+        updateUser(response.data.user); // 사용자 정보 업데이트
         toast({
           title: "프로필이 업데이트되었습니다",
           description: "변경사항이 성공적으로 저장되었습니다."
@@ -653,7 +653,7 @@ const Settings = () => {
 
               <div>
                 <Label htmlFor="theme">테마</Label>
-                <Select value={theme} onValueChange={(value) => setTheme(value as 'light' | 'dark' | 'system' | 'pink')}>
+                <Select value={theme} onValueChange={(value) => setTheme(value as 'light' | 'dark' | 'system' | 'pastel')}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>

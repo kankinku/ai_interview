@@ -385,7 +385,7 @@ exports.getRecentInterviews = async (req, res) => {
         let evaluations = {};
         try {
             const [scores] = await db.query(
-                `SELECT interview_id, total_score FROM evaluations WHERE interview_id IN (?)`,
+                `SELECT interview_id, total_score FROM total_result WHERE interview_id IN (?)`,
                 [interviewIds]
             );
             scores.forEach(s => {
@@ -395,8 +395,8 @@ exports.getRecentInterviews = async (req, res) => {
             if (err.code !== 'ER_NO_SUCH_TABLE') {
                 throw err; // 다른 종류의 에러는 그대로 전파
             }
-            // evaluations 테이블이 없는 경우, 점수 없이 진행
-            console.warn("`evaluations` table not found, proceeding without scores.");
+            // total_result 테이블이 없는 경우, 점수 없이 진행
+            console.warn("`total_result` table not found, proceeding without scores.");
         }
 
         const results = sessions.map(s => ({

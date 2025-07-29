@@ -49,8 +49,20 @@ const Interview = () => {
         setQuestions(["로그인이 필요합니다. 로그인 후 다시 시도해주세요."]);
         return;
       }
+
+      if (!user.targetCompanyId) {
+        setIsLoading(false);
+        setQuestions(["목표 기업이 설정되지 않았습니다. 설정 페이지에서 목표 기업을 선택해주세요."]);
+        toast({
+          title: "목표 기업 미설정",
+          description: "설정 페이지에서 먼저 면접을 볼 기업을 선택해주세요.",
+          duration: 5000,
+        });
+        return;
+      }
+
       try {
-        const response = await axios.get(`/api/interview/questions/${user.id}`);
+        const response = await axios.get(`/api/interview/questions/${user.id}/${user.targetCompanyId}`);
         if (response.data.questions && response.data.questions.length > 0) {
           setQuestions(response.data.questions);
         } else {
@@ -139,7 +151,7 @@ const Interview = () => {
           });
         }
       } catch (error) {
-        console.error("Frame analysis failed:", error);
+        console.error("Frame analysis failed:", error.response ? error.response.data : error.message);
       }
     }, 1000); // 1초(1000ms)마다 분석 실행
 

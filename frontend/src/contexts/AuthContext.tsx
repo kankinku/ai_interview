@@ -5,13 +5,15 @@ interface User {
     id: number;
     name: string;
     email: string;
+    targetCompanyId?: number;
 }
 
 interface AuthContextType {
     user: User | null;
     signUp: (email: string, password: string, name: string) => Promise<any>;
-    login: (email: string, password: string) => Promise<any>;
+    login: (email: string, password:string) => Promise<any>;
     logout: () => void;
+    updateUser: (newUser: User) => void; // updateUser 함수 추가
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -68,7 +70,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
     };
 
-    const value = { user, signUp, login, logout };
+    const updateUser = (newUser: User) => {
+        localStorage.setItem("user", JSON.stringify(newUser));
+        setUser(newUser);
+    };
+
+    const value = { user, signUp, login, logout, updateUser };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

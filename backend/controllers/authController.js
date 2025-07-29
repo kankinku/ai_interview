@@ -7,7 +7,7 @@ exports.login = async (req, res) => {
 
     try {
         const [rows] = await db.execute(
-            `SELECT li.user_id, li.password_hash, u.user_name
+            `SELECT li.user_id, li.password_hash, u.user_name, u.target_company_id
             FROM login_info li
             JOIN user_info u ON li.user_id = u.user_id
             WHERE li.user_identifier = ?`,
@@ -37,7 +37,8 @@ exports.login = async (req, res) => {
             user: {
                 id: user.user_id,
                 name: user.user_name,
-                email
+                email,
+                targetCompanyId: user.target_company_id
             },
             hasQuestions
         });
@@ -108,7 +109,7 @@ const parseSalary = (salaryString) => {
 
 
 exports.updateProfile = async (req, res) => {
-    const { userId, name, email, position, experience, targetCompany, targetSalary } = req.body;
+    const { userId, name, email, position, experience, targetCompany, targetSalary, targetCompanyId } = req.body;
 
     if (!userId) {
         return res.status(400).json({ error: "사용자 ID가 필요합니다." });
@@ -120,20 +121,24 @@ exports.updateProfile = async (req, res) => {
     try {
         const [result] = await db.execute(
             `UPDATE user_info 
-             SET user_name = ?, email = ?, learning_field = ?, career_years = ?, desired_salary = ?
+             SET user_name = ?, email = ?, learning_field = ?, career_years = ?, desired_salary = ?, target_company_id = ?
              WHERE user_id = ?`,
-            [name, email, position, career_years, desired_salary, userId]
+            [name, email, position, career_years, desired_salary, targetCompanyId, userId]
         );
-        
-        // targetCompany는 company_info 테이블에 업데이트 해야 할 수도 있습니다.
-        // 우선 user_info에 관련 필드가 없으므로 여기서는 처리하지 않습니다.
-        // 만약 company_info와 user_info를 연결하는 로직이 필요하다면 추가 구현이 필요합니다.
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: "사용자를 찾을 수 없습니다." });
         }
 
-        res.json({ message: "프로필이 성공적으로 업데이트되었습니다." });
+        // 업데이트된 사용자 정보를 클라이언트에 다시 보내줍니다.
+        const updatedUser = {
+            id: userId,
+            name: name,
+            email: email,
+            targetCompanyId: targetCompanyId
+        };
+
+        res.json({ message: "프로필이 성공적으로 업데이트되었습니다.", user: updatedUser });
     } catch (err) {
         console.error("프로필 업데이트 오류:", err);
         res.status(500).json({ error: "서버 오류" });
@@ -149,9 +154,10 @@ exports.getProfile = async (req, res) => {
 
     try {
         const [rows] = await db.execute(
-            `SELECT user_name, email, learning_field, career_years, desired_salary 
-             FROM user_info 
-             WHERE user_id = ?`,
+            `SELECT u.user_name, u.email, u.learning_field, u.career_years, u.desired_salary, u.target_company_id, c.company_name as target_company_name
+             FROM user_info u
+             LEFT JOIN company c ON u.target_company_id = c.company_id
+             WHERE u.user_id = ?`,
             [userId]
         );
 
@@ -189,7 +195,7 @@ exports.getProfile = async (req, res) => {
             position: userProfile.learning_field,
             experience: formatExperience(userProfile.career_years),
             targetSalary: formatSalary(userProfile.desired_salary),
-            // targetCompany는 별도 테이블 또는 로직 필요
+            targetCompany: userProfile.target_company_name
         });
 
     } catch (err) {

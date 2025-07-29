@@ -34,10 +34,17 @@ type DashboardStats = {
   weeklyStudyHours: number;
 };
 
+type SkillArea = {
+  name: string;
+  score: number;
+  color: string;
+};
+
 const Dashboard = () => {
   const { user } = useAuth();
   const [selectedGoal, setSelectedGoal] = useState(85);
   const [recentInterviews, setRecentInterviews] = useState<Interview[]>([]);
+  const [skillAreas, setSkillAreas] = useState<SkillArea[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
     totalInterviews: 0,
     averageScore: 0,
@@ -57,15 +64,32 @@ const Dashboard = () => {
         .get(`/api/dashboard/stats/${user.id}`)
         .then((res) => setStats(res.data))
         .catch((err) => console.error("대시보드 통계 불러오기 실패:", err));
+      
+      // 역량 분석 데이터 불러오기
+      axios
+        .get(`/api/dashboard/skills/${user.id}`)
+        .then((res) => {
+          const skills = res.data;
+          if (skills.length > 0) {
+            const avgScore = skills.reduce((acc: any, cur: any) => acc + cur.score, 0) / skills.length;
+            skills.push({ name: "안면 분석", score: Math.round(avgScore), color: "bg-orange-500" });
+          }
+          setSkillAreas(skills);
+        })
+        .catch((err) => console.error("역량 분석 데이터 불러오기 실패:", err));
     }
   }, [user]);
 
+
+  //하드코딩 내용 추가 개선 필요.
+  /*
   const skillAreas = [
-    { name: "기술 역량", score: 85, color: "bg-blue-500" },
-    { name: "의사소통", score: 78, color: "bg-green-500" },
-    { name: "문제해결", score: 80, color: "bg-purple-500" },
-    { name: "리더십", score: 72, color: "bg-orange-500" }
+    { name:  "표정 분석", score: 85, color: "bg-blue-500" },
+    { name: "음성 분석", score: 78, color: "bg-green-500" },
+    { name: "언어 분석", score: 80, color: "bg-purple-500" },
+    { name: "안면 분석", score: 72, color: "bg-orange-500" }
   ];
+  */
 
   const achievementRate = stats.averageScore && selectedGoal ? Math.round((stats.averageScore / selectedGoal) * 100) : 0;
 

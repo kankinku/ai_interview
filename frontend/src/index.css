@@ -7,7 +7,7 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 220 100% 45%; /* Dark blue for light mode text */
+    --foreground: 221 80% 48%; /* Dark blue for light mode text */
 
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
