@@ -40,7 +40,8 @@ const Login = () => {
             <div className="w-full max-w-md">
                 <div className="text-center mb-8">
                     <Link to="/" className="inline-flex items-center space-x-2 mb-6">
-                        <Brain className="h-10 w-10 text-blue-600" />
+                        {/* <Brain className="h-10 w-10 text-blue-600" /> */}
+                        {/* <img src="/kong.png" className="h-12 w-12 object-contain" /> */}
                         <span className="text-2xl font-bold text-slate-900">AI Interview</span>
                     </Link>
                     <p className="text-slate-600">계정에 로그인하여 AI 면접을 시작하세요</p>
