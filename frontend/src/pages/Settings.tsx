@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { useNavigate } from "react-router-dom";
 import { 
   User, 
   Camera, 
@@ -35,6 +36,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const Settings = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { user, updateUser } = useAuth(); // updateUser 가져오기
   const { theme, setTheme } = useTheme();
   const [profile, setProfile] = useState({
@@ -219,12 +221,11 @@ const Settings = () => {
 
         console.log("생성된 질문:", response.data.questions);
 
-        toast({
-            title: "질문 생성이 완료되었습니다",
-            description: "생성된 면접 질문을 확인해보세요.",
-        });
+        sonnerToast.success("질문 생성이 완료되었습니다. 잠시 후 면접 페이지로 이동합니다.");
 
-        window.location.reload();
+        setTimeout(() => {
+          navigate("/interview");
+        }, 2000);
 
     } catch (error) {
         console.error("질문 생성 실패:", error);
