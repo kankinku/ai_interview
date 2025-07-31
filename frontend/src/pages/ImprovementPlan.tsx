@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,27 +15,98 @@ import {
   ExternalLink,
   Star,
   Clock,
-  Award
+  Award,
+  Loader2,
+  AlertCircle
 } from "lucide-react";
+import axios from "axios";
+import { useAuth } from "@/contexts/AuthContext";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const ImprovementPlan = () => {
+  const { user } = useAuth();
   const [selectedWeek, setSelectedWeek] = useState(1);
+  const [skillScores, setSkillScores] = useState<{ name: string; score: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const currentScores = {
-    overall: 78.5,
-    technical: 85,
-    communication: 78,
-    problemSolving: 80,
-    leadership: 72
+  useEffect(() => {
+    const fetchSkillScores = async () => {
+      if (!user) {
+        setError("로그인이 필요합니다.");
+        setLoading(false);
+        return;
+      }
+      try {
+        setLoading(true);
+        const response = await axios.get(`/api/dashboard/skills/${user.id}`);
+        const fetchedSkills = response.data;
+
+        if (fetchedSkills.length > 0) {
+          const avgScore = Math.round(fetchedSkills.reduce((acc: number, cur: { score: number }) => acc + cur.score, 0) / fetchedSkills.length);
+          fetchedSkills.push({ name: "안면 분석", score: avgScore });
+        }
+        
+        setSkillScores(fetchedSkills);
+        setError(null);
+      } catch (err) {
+        if (axios.isAxiosError(err) && err.response?.status === 404) {
+          setError("아직 분석된 면접이 없어 점수를 표시할 수 없습니다.");
+        } else {
+          setError("점수를 불러오는 중 오류가 발생했습니다.");
+        }
+        console.error("역량 점수 로딩 실패:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSkillScores();
+  }, [user]);
+
+  const targetScores: { [key: string]: number } = {
+    "언어 분석": 85,
+    "음성 분석": 75,
+    "표정 분석": 90,
+    "안면 분석": 80
   };
 
-  const targetScores = {
-    overall: 85,
-    technical: 90,
-    communication: 85,
-    problemSolving: 85,
-    leadership: 80
+  // 점수에 따른 가중치 계산 함수
+  const getWeightByScore = (score: number) => {
+    if (score < 70) return 4;
+    if (score < 80) return 3;
+    if (score < 90) return 2;
+    return 1;
   };
+
+  // 학습 우선순위 분석
+  const analyzeSkillPriorities = () => {
+    if (skillScores.length === 0) return null;
+
+    const priorities = skillScores.map(skill => ({
+      ...skill,
+      weight: getWeightByScore(skill.score),
+      gap: (targetScores[skill.name] || 80) - skill.score,
+      priority: getWeightByScore(skill.score) * Math.max((targetScores[skill.name] || 80) - skill.score, 0)
+    }));
+
+    // 우선순위 순으로 정렬
+    priorities.sort((a, b) => b.priority - a.priority);
+
+    const totalWeight = priorities.reduce((sum, item) => sum + item.weight, 0);
+    const highPriorityItems = priorities.filter(item => item.weight >= 3);
+    const lowPriorityItems = priorities.filter(item => item.weight < 3);
+
+    return {
+      priorities,
+      totalWeight,
+      highPriorityItems,
+      lowPriorityItems,
+      focusAreas: priorities.slice(0, 2), // 상위 2개 집중 영역
+    };
+  };
+
+  const priorityAnalysis = analyzeSkillPriorities();
 
   const learningPath = [
     {
@@ -85,25 +155,25 @@ const ImprovementPlan = () => {
     {
       category: "동영상 강의",
       items: [
-        { title: "면접의 기술 - STAR 기법 완벽 가이드", duration: "45분", rating: 4.8, url: "#" },
-        { title: "IT 면접 필수 질문 100선", duration: "2시간", rating: 4.9, url: "#" },
-        { title: "자신감 있는 면접을 위한 발표 기법", duration: "1시간", rating: 4.7, url: "#" }
+        { title: "STAR 기법 완벽 가이드 - 행동 면접 질문 대답법", duration: "15분", rating: 4.8, url: "https://www.youtube.com/watch?v=uQEuo7woEEk" },
+        { title: "면접에서 자주 묻는 질문과 답변 기술", duration: "12분", rating: 4.7, url: "https://www.youtube.com/watch?v=PHqcLX3qSYo" },
+        { title: "아마존 면접 STAR 기법 활용법", duration: "10분", rating: 4.9, url: "https://www.youtube.com/watch?v=UQrTMxouDUY" }
       ]
     },
     {
       category: "실습 자료",
       items: [
-        { title: "면접 질문 뱅크 (분야별 300개)", type: "PDF", rating: 4.6, url: "#" },
-        { title: "자기소개서 템플릿 모음", type: "DOCX", rating: 4.8, url: "#" },
-        { title: "기술 면접 체크리스트", type: "PDF", rating: 4.7, url: "#" }
+        { title: "취업 준비 면접 질문 모음집 (GitHub)", type: "Repository", rating: 4.8, url: "https://github.com/4z7l/tech_interview.zip" },
+        { title: "소프트웨어 엔지니어 면접 질문 259개", type: "PDF", rating: 4.6, url: "https://devskiller.com/software-engineer-interview-questions/" },
+        { title: "파이썬 프로그래밍 면접 질문 100개", type: "PDF", rating: 4.7, url: "https://akcoding.com/python-programming-interview-questions-and-answers-pdf/" }
       ]
     },
     {
       category: "추천 도서",
       items: [
-        { title: "면접의 정석", author: "김면접", rating: 4.5, url: "#" },
-        { title: "IT 개발자 면접 가이드북", author: "이개발", rating: 4.7, url: "#" },
-        { title: "성공하는 면접의 기술", author: "박성공", rating: 4.6, url: "#" }
+        { title: "Cracking the Coding Interview", author: "Gayle Laakmann McDowell", rating: 4.8, url: "https://www.crackingthecodinginterview.com/" },
+        { title: "I Hate Job Interviews", author: "Sam Owens", rating: 4.5, url: "https://www.harpercollinsfocus.com/9781400245918/i-hate-job-interviews/" },
+        { title: "Behavioral Interviews for Software Engineers", author: "Melia Stevanovic", rating: 4.6, url: "https://www.amazon.com/dp/B0C1JFQYCR" }
       ]
     }
   ];
@@ -114,6 +184,45 @@ const ImprovementPlan = () => {
     { week: 3, target: "의사소통 점수 82점 이상", achieved: false },
     { week: 4, target: "전체 목표 점수 85점 달성", achieved: false }
   ];
+  
+  const renderScores = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center h-40">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      );
+    }
+
+    if (error || skillScores.length === 0) {
+      return (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>오류</AlertTitle>
+          <AlertDescription>{error || "데이터를 불러오는 데 실패했습니다."}</AlertDescription>
+        </Alert>
+      );
+    }
+
+    return (
+        <div className="space-y-6">
+          {skillScores.map((skill, index) => (
+            <div key={index} className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="font-medium text-foreground">{skill.name}</span>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-foreground">{skill.score}점</span>
+                  <span className="text-slate-400">→</span>
+                  <span className="font-bold text-primary">{targetScores[skill.name] || 80}점</span>
+                </div>
+              </div>
+              <Progress value={skill.score} className="h-2" />
+            </div>
+          ))}
+        </div>
+    );
+  };
+
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -133,37 +242,7 @@ const ImprovementPlan = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-6">
-              {[
-                { name: "종합 점수", current: currentScores.overall, target: targetScores.overall },
-                { name: "기술 역량", current: currentScores.technical, target: targetScores.technical },
-                { name: "의사소통", current: currentScores.communication, target: targetScores.communication },
-                { name: "문제해결", current: currentScores.problemSolving, target: targetScores.problemSolving },
-                { name: "리더십", current: currentScores.leadership, target: targetScores.leadership }
-              ].map((skill, index) => (
-                <div key={index} className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium text-foreground">{skill.name}</span>
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-foreground">{skill.current}점</span>
-                      <span className="text-slate-400">→</span>
-                      <span className="font-bold text-primary">{skill.target}점</span>
-                    </div>
-                  </div>
-                  <div className="relative">
-                    <Progress value={(skill.current / 100) * 100} className="h-2" />
-                    <div 
-                      className="absolute top-0 h-2 bg-blue-200 rounded-full"
-                      style={{ 
-                        width: `${(skill.target / 100) * 100}%`,
-                        left: `${(skill.current / 100) * 100}%`,
-                        transform: `translateX(-${(skill.current / 100) * 100}%)`
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+            {renderScores()}
           </CardContent>
         </Card>
 
@@ -240,15 +319,15 @@ const ImprovementPlan = () => {
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle>
-                  {selectedWeek}주차: {learningPath[selectedWeek - 1].theme}
+                  {selectedWeek}주차: {learningPath.find(w => w.week === selectedWeek)?.theme}
                 </CardTitle>
                 <p className="text-sm text-foreground">
-                  {learningPath[selectedWeek - 1].focus}
+                  {learningPath.find(w => w.week === selectedWeek)?.focus}
                 </p>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {learningPath[selectedWeek - 1].tasks.map((task, index) => (
+                  {learningPath.find(w => w.week === selectedWeek)?.tasks.map((task, index) => (
                     <div key={index} className="flex items-center gap-4 p-4 border rounded-lg">
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
                         task.completed ? 'bg-green-100' : 'bg-slate-100'
@@ -297,7 +376,7 @@ const ImprovementPlan = () => {
                   <div className="p-4 bg-blue-50 rounded-lg">
                     <h3 className="font-medium text-primary mb-2">이번 주 핵심 목표</h3>
                     <p className="text-sm text-primary">
-                      {learningPath[selectedWeek - 1].focus}
+                      {learningPath.find(w => w.week === selectedWeek)?.focus}
                     </p>
                   </div>
 
@@ -334,8 +413,8 @@ const ImprovementPlan = () => {
           </div>
         </TabsContent>
 
-        {/* Resources */}
-        <TabsContent value="resources" className="space-y-6">
+        {/* Resources & Schedule Tabs remain the same */}
+        <TabsContent value="resources">
           <div className="grid lg:grid-cols-3 gap-6">
             {resources.map((category, categoryIndex) => (
               <Card key={categoryIndex}>
@@ -374,7 +453,12 @@ const ImprovementPlan = () => {
                             <span className="text-xs font-medium">{item.rating}</span>
                           </div>
                         </div>
-                        <Button variant="outline" size="sm" className="w-full">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full"
+                          onClick={() => window.open(item.url, '_blank')}
+                        >
                           <ExternalLink className="mr-2 h-3 w-3" />
                           보기
                         </Button>
@@ -386,9 +470,7 @@ const ImprovementPlan = () => {
             ))}
           </div>
         </TabsContent>
-
-        {/* Schedule */}
-        <TabsContent value="schedule" className="space-y-6">
+        <TabsContent value="schedule">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">

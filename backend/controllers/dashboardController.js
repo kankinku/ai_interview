@@ -63,20 +63,24 @@ exports.getSkillAnalysis = async (req, res) => {
             JOIN interview_session s ON tr.interview_id = s.interview_id
             WHERE s.user_id = ?
         `;
+
         const [results] = await db.execute(query, [userId]);
-        
         const skillScores = results[0];
+        
+        if (!skillScores || skillScores.verbal_score === null) {
+            return res.status(404).json({ message: "아직 분석된 면접 데이터가 없습니다." });
+        }
 
         const skillAreas = [
-            { name: "언어 분석", score: skillScores.verbal_score ? parseFloat(skillScores.verbal_score) : 0, color: "bg-purple-500" },
-            { name: "음성 분석", score: skillScores.voice_score ? parseFloat(skillScores.voice_score) : 0, color: "bg-green-500" },
-            { name: "표정 분석", score: skillScores.visual_score ? parseFloat(skillScores.visual_score) : 0, color: "bg-blue-500" },
+            { name: "언어 분석", score: Math.round(parseFloat(skillScores.verbal_score || 0)), color: "bg-purple-500" },
+            { name: "음성 분석", score: Math.round(parseFloat(skillScores.voice_score || 0)), color: "bg-green-500" },
+            { name: "표정 분석", score: Math.round(parseFloat(skillScores.visual_score || 0)), color: "bg-blue-500" },
         ];
-
+ 
         res.json(skillAreas);
 
     } catch (err) {
         console.error("역량 분석 데이터 조회 오류:", err);
         res.status(500).json({ error: "서버 오류" });
     }
-}; 
+};
